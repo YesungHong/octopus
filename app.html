@@ -98,6 +98,8 @@ button,.row,.chip,.tabs button,.condpick button,.seg button,.dowpick button{
   border:1px solid color-mix(in srgb,var(--good) 28%,transparent);
   font-size:12.5px;line-height:1.6;color:var(--good)}
 .tnote b{font-weight:700}
+.tnote.up{background:var(--accent-soft);color:var(--accent-ink);
+  border-color:color-mix(in srgb,var(--accent) 28%,transparent)}
 .wrap{max-width:620px;margin:0 auto;padding:20px 16px 0}
 
 /* ── masthead ─────────────────────────────────────────────────── */
@@ -659,6 +661,17 @@ function load(){
 
   var b = blank();
   for (var k in b) if (!(k in S)) S[k] = b[k];
+
+  /* sweep minutes and log entries left behind by tasks deleted before the
+     deletion path cleaned up after itself */
+  var live = {};
+  (S.tasks || []).forEach(function(t){ live[t.id] = 1; });
+  [S.time, S.log].forEach(function(store){
+    for (var d in store){
+      for (var id in store[d]) if (!live[id]) delete store[d][id];
+      if (!Object.keys(store[d]).length) delete store[d];
+    }
+  });
   return S;
 }
 
@@ -695,20 +708,30 @@ function sleepHours(c){
 }
 function condOn(ds){ return S.cond[ds] || null; }
 
-/* A rough day earns a smaller finish line. Offsets, not fixed numbers, so this
-   still holds if the base target is moved in settings. */
+/* A rough day earns a smaller finish line. Defaults derive from the base target;
+   once the user edits them in settings they're stored outright and stay put. */
+function defaultCondTargets(){
+  var b = S.dailyTarget;
+  return { 1: Math.max(1, b-2), 2: Math.max(1, b-1), 3: b, 4: b, 5: b };
+}
+function condTargets(){ return S.condTarget || defaultCondTargets(); }
 function targetFor(ds){
-  var base = S.dailyTarget, c = condOn(ds);
-  if (!c || !c.score) return base;
-  if (c.score === 1) return Math.max(1, base - 2);
-  if (c.score === 2) return Math.max(1, base - 1);
-  return base;
+  var c = condOn(ds);
+  if (!c || !c.score) return S.dailyTarget;
+  var m = condTargets();
+  return m[c.score] || S.dailyTarget;
 }
 function targetNote(ds){
   var c = condOn(ds);
-  if (!c || !c.score || c.score > 2) return "";
-  return '<div class="tnote">컨디션이 <b>'+ CLABEL[c.score] +'</b>이라 오늘 목표를 '
-       + targetFor(ds) +'pt로 낮췄어. 그만큼이면 오늘 몫은 다 한 거야.</div>';
+  if (!c || !c.score) return "";
+  var t = targetFor(ds), b = S.dailyTarget;
+  if (t === b) return "";
+  if (t < b){
+    return '<div class="tnote">컨디션이 <b>'+ CLABEL[c.score] +'</b>이라 오늘 목표를 '
+         + t +'pt로 낮췄어. 그만큼이면 오늘 몫은 다 한 거야.</div>';
+  }
+  return '<div class="tnote up">컨디션이 <b>'+ CLABEL[c.score] +'</b>이라 오늘 목표가 '
+       + t +'pt야. 무리다 싶으면 설정에서 언제든 내려도 돼.</div>';
 }
 function setCond(ds, key, val){
   if (!S.cond[ds]) S.cond[ds] = {};
@@ -1839,6 +1862,26 @@ function viewSettings(){
     +   '<input type="number" min="1" max="200" id="swt" value="'+S.weeklyTarget+'"></div>'
     + '</div>';
 
+  /* per-condition targets */
+  var ct = condTargets();
+  h += '<div class="card"><h2>컨디션별 목표</h2>';
+  h += '<div class="secintro">그날 컨디션에 따라 목표를 다르게 잡아. '
+     + '지친 날에 같은 선을 요구하지 않으려고 있는 기능이야.</div>';
+  [1,2,3,4,5].forEach(function(k){
+    h += '<div class="setrow"><div>'+ CLABEL[k] +'<small>컨디션 '+ k +'점</small></div>'
+       + '<input type="number" min="1" max="60" class="cst" data-k="'+k+'" value="'+ ct[k] +'"></div>';
+  });
+  if (S.condTarget){
+    h += '<button class="jump" data-act="ctreset" style="margin-top:14px">'
+       + '기본값으로 되돌리기 <em>'+ Math.max(1,S.dailyTarget-2) +' / '
+       + Math.max(1,S.dailyTarget-1) +' / '+ S.dailyTarget +'</em></button>';
+  } else {
+    h += '<div class="studyhint" style="text-align:left">지금은 일간 목표('
+       + S.dailyTarget +'pt)를 따라 자동으로 정해져 있어. '
+       + '한 번 직접 고치면 그 값이 고정되고, 일간 목표를 바꿔도 안 따라가.</div>';
+  }
+  h += '</div>';
+
   /* backup — the data lives in one browser and nowhere else */
   var days = Object.keys(S.log).length, cd = Object.keys(S.cond).length;
   var since = S.lastBackup ? Math.floor((Date.now() - S.lastBackup) / 86400000) : null;
@@ -2167,6 +2210,20 @@ function wire(){
     box.addEventListener("change", commit);
   });
 
+  var csts = document.querySelectorAll("input.cst");
+  if (csts.length){
+    csts.forEach(function(box){
+      box.addEventListener("change", function(){
+        var m = S.condTarget ? S.condTarget : condTargets();
+        var v = Math.max(1, Math.min(60, parseInt(box.value,10) || 1));
+        m[+box.dataset.k] = v;
+        S.condTarget = m;
+        box.value = v;
+        save(); render2("settings");
+      });
+    });
+  }
+
   var imp = el("impfile");
   if (imp){
     imp.addEventListener("change", function(){
@@ -2273,8 +2330,11 @@ function doAct(act, n){
     var tid = n.dataset.id;
     S.tasks = S.tasks.filter(function(t){ return t.id !== tid; });
     for (var d in S.log){ delete S.log[d][tid]; if (!Object.keys(S.log[d]).length) delete S.log[d]; }
-    save(); render(); return;
+    /* its minutes go with it, or they keep counting toward daily totals */
+    for (var d2 in S.time){ delete S.time[d2][tid]; if (!Object.keys(S.time[d2]).length) delete S.time[d2]; }
+    timingId = null; save(); render(); return;
   }
+  if (act === "ctreset"){ S.condTarget = null; save(); render2("settings"); return; }
   if (act === "add"){
     var nt = el("nt"), title = nt.value.trim();
     if (!title){ nt.focus(); return; }
