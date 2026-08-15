@@ -662,9 +662,7 @@ function viewCond(d){
      + '<label>일어난 시각<input type="time" id="cWake" value="'+ (c.wake||"") +'"></label>'
      + '</div>';
   h += '<div class="sleepbig">'
-     + (hrs === null
-         ? '<span class="none">두 시각을 넣으면 수면 시간이 계산돼</span>'
-         : '<b>'+ hrs.toFixed(1) +'</b><em>시간</em>')
+     + sleepBigText(hrs)
      + '</div>';
 
   h += '<h2 class="mt">컨디션</h2>';
@@ -683,16 +681,39 @@ function viewCond(d){
   h += '<div class="card"><h2>하루 보고서</h2>';
   h += '<div class="drep">'
      + drow("퀘스트", pts + ' / ' + tgt + ' pt', pts >= tgt ? "good" : "")
-     + drow("수면", hrs === null ? "—" : hrs.toFixed(1) + '시간'
-            + (c.sleep && c.wake ? ' <s>'+c.sleep+' → '+c.wake+'</s>' : ''), "")
+     + drow("수면", sleepText(c, hrs), "", "dSleepVal")
      + drow("컨디션", c.score ? CLABEL[c.score] : "—", "")
      + '</div>';
-  h += '<div class="note">🐙 '+ esc(dayComment(pts, tgt, hrs, c.score, ds)) +'</div>';
+  h += '<div class="note" id="dnote">🐙 '+ esc(dayComment(pts, tgt, hrs, c.score, ds)) +'</div>';
   h += '</div>';
   return h;
 }
-function drow(k, v, cls){
-  return '<div class="drow'+(cls?' '+cls:'')+'"><div class="k">'+ k +'</div><div class="v">'+ v +'</div></div>';
+function drow(k, v, cls, id){
+  return '<div class="drow'+(cls?' '+cls:'')+'"><div class="k">'+ k +'</div>'
+       + '<div class="v"'+(id?' id="'+id+'"':'')+'>'+ v +'</div></div>';
+}
+function sleepText(c, hrs){
+  if (hrs === null) return "—";
+  return hrs.toFixed(1) + '시간'
+       + (c.sleep && c.wake ? ' <s>'+ c.sleep +' → '+ c.wake +'</s>' : '');
+}
+function sleepBigText(hrs){
+  return hrs === null
+    ? '<span class="none">두 시각을 넣으면 수면 시간이 계산돼</span>'
+    : '<b>'+ hrs.toFixed(1) +'</b><em>시간</em>';
+}
+
+/* Update only the numbers that depend on the clocks. A full re-render here
+   would rip out the input the iOS wheel is still sitting in — the wheel fires
+   `change` on every tick, long before the user taps 완료. */
+function patchSleep(){
+  var ds = iso(cursorDay()), c = condOn(ds) || {}, hrs = sleepHours(c);
+  var big = document.querySelector(".sleepbig");
+  if (big) big.innerHTML = sleepBigText(hrs);
+  var val = el("dSleepVal");
+  if (val) val.innerHTML = sleepText(c, hrs);
+  var note = el("dnote");
+  if (note) note.textContent = "🐙 " + dayComment(ptsOn(ds), S.dailyTarget, hrs, c.score, ds);
 }
 
 function dayComment(pts, tgt, hrs, score, ds){
@@ -1267,14 +1288,18 @@ function wire(){
     });
   }
 
-  /* sleep clocks — commit on change, not on every keystroke, so focus survives */
+  /* sleep clocks — save every tick, but never re-render while the picker is open */
   ["cSleep","cWake"].forEach(function(id){
     var box = el(id);
     if (!box) return;
-    box.addEventListener("change", function(){
-      setCond(iso(cursorDay()), id === "cSleep" ? "sleep" : "wake", box.value);
-      save(); render();
-    });
+    var key = (id === "cSleep") ? "sleep" : "wake";
+    function commit(){
+      setCond(iso(cursorDay()), key, box.value);
+      save();
+      patchSleep();
+    }
+    box.addEventListener("input",  commit);
+    box.addEventListener("change", commit);
   });
 
   var sdt = el("sdt"), swt = el("swt");
