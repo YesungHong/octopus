@@ -28,6 +28,7 @@
   --accent-soft:rgba(176,106,22,.13);
   --good:#2C7A5E;
   --good-soft:rgba(44,122,94,.13);
+  --cs1:#93A6AB; --cs2:#7C9AA3; --cs3:#3F7F8C; --cs4:#3D8A72; --cs5:#2C7A5E;
   --t1:#7C939A;
   --t2:#3F7F8C;
   --t3:#B06A16;
@@ -51,6 +52,7 @@
     --accent-soft:rgba(224,160,80,.16);
     --good:#4FA383;
     --good-soft:rgba(79,163,131,.16);
+    --cs1:#5E767D; --cs2:#5B8B96; --cs3:#5AA2B0; --cs4:#4FA383; --cs5:#6FBF9C;
     --t1:#6A828A;
     --t2:#5AA2B0;
     --t3:#E0A050;
@@ -72,6 +74,7 @@
   --accent-soft:rgba(224,160,80,.16);
   --good:#4FA383;
   --good-soft:rgba(79,163,131,.16);
+  --cs1:#5E767D; --cs2:#5B8B96; --cs3:#5AA2B0; --cs4:#4FA383; --cs5:#6FBF9C;
   --t1:#6A828A;
   --t2:#5AA2B0;
   --t3:#E0A050;
@@ -370,9 +373,19 @@ button,.row,.chip,.tabs button,.condpick button,.seg button,.dowpick button{
   display:flex;flex-direction:column;align-items:center;gap:6px;
   -webkit-tap-highlight-color:transparent}
 .condpick button i{width:11px;height:11px;border-radius:50%;display:block}
-.condpick i.c1{background:var(--t1)} .condpick i.c2{background:#8E9AA0}
-.condpick i.c3{background:var(--t2)} .condpick i.c4{background:#4E9A7E}
-.condpick i.c5{background:var(--good)}
+.condpick i.c1{background:var(--cs1)} .condpick i.c2{background:var(--cs2)}
+.condpick i.c3{background:var(--cs3)} .condpick i.c4{background:var(--cs4)}
+.condpick i.c5{background:var(--cs5)}
+
+/* ── sleep trend chart ────────────────────────────────────────── */
+.schart{width:100%;height:auto;display:block;overflow:visible}
+.slegend{display:flex;align-items:center;gap:5px;margin-top:10px;flex-wrap:wrap;
+  font-size:10.5px;color:var(--ink-3)}
+.slegend i{width:9px;height:9px;border-radius:50%;display:block;flex:none}
+.slegend i.cs1{background:var(--cs1)} .slegend i.cs2{background:var(--cs2)}
+.slegend i.cs3{background:var(--cs3)} .slegend i.cs4{background:var(--cs4)}
+.slegend i.cs5{background:var(--cs5)}
+.slegend .lr{margin-left:2px}
 .condpick button:hover{border-color:var(--ink-3);color:var(--ink)}
 .condpick button[aria-pressed="true"]{background:var(--surface-2);border-color:var(--accent);
   color:var(--ink);box-shadow:0 0 0 2px var(--accent-soft)}
@@ -846,6 +859,74 @@ function dayNav(d){
 }
 
 /* ── 컨디션 ── */
+/* Sleep over time. Gaps are left as gaps — the line never bridges a night you
+   didn't record, because a straight line across missing data reads as a
+   measurement that was never taken. */
+function sleepChart(endDate, nDays){
+  var pts = [];
+  for (var i = nDays-1; i >= 0; i--){
+    var d = addDays(endDate, -i), ds = iso(d), c = condOn(ds);
+    pts.push({ ds: ds, d: d, hrs: sleepHours(c), score: c && c.score ? c.score : 0 });
+  }
+  var have = pts.filter(function(p){ return p.hrs !== null; });
+  if (!have.length){
+    return '<div class="need">아직 수면 기록이 없어. 위에서 잠든 시각과 일어난 시각을 넣어봐.</div>';
+  }
+
+  var W = 320, H = 132, pl = 24, pr = 8, pt_ = 10, pb = 20;
+  var top = Math.max(9, Math.ceil(Math.max.apply(null, have.map(function(p){ return p.hrs; }))));
+  var n = pts.length;
+  var X = function(i){ return pl + (n <= 1 ? (W-pl-pr)/2 : i*(W-pl-pr)/(n-1)); };
+  var Y = function(v){ return pt_ + (1 - v/top) * (H-pt_-pb); };
+  var avg = mean(have.map(function(p){ return p.hrs; }));
+
+  var s = '<svg class="schart" viewBox="0 0 '+W+' '+H+'" role="img" '
+        + 'aria-label="최근 '+nDays+'일 수면 시간 추이">';
+
+  /* gridlines */
+  [0, top/2, top].forEach(function(v){
+    s += '<line x1="'+pl+'" y1="'+Y(v).toFixed(1)+'" x2="'+(W-pr)+'" y2="'+Y(v).toFixed(1)+'" '
+       + 'stroke="var(--line-soft)" stroke-width="1"/>'
+       + '<text x="'+(pl-5)+'" y="'+(Y(v)+3.5).toFixed(1)+'" text-anchor="end" '
+       + 'font-size="8" fill="var(--ink-3)">'+ (v % 1 ? v.toFixed(1) : v) +'</text>';
+  });
+
+  /* the user's own average, as a description — not a recommendation */
+  s += '<line x1="'+pl+'" y1="'+Y(avg).toFixed(1)+'" x2="'+(W-pr)+'" y2="'+Y(avg).toFixed(1)+'" '
+     + 'stroke="var(--accent)" stroke-width="1" stroke-dasharray="3 3" opacity=".7"/>'
+     + '<text x="'+(W-pr)+'" y="'+(Y(avg)-4).toFixed(1)+'" text-anchor="end" '
+     + 'font-size="8" fill="var(--accent-ink)">평균 '+ avg.toFixed(1) +'h</text>';
+
+  /* segments only between adjacent recorded nights */
+  for (var k=0;k<n-1;k++){
+    if (pts[k].hrs === null || pts[k+1].hrs === null) continue;
+    s += '<line x1="'+X(k).toFixed(1)+'" y1="'+Y(pts[k].hrs).toFixed(1)+'" '
+       + 'x2="'+X(k+1).toFixed(1)+'" y2="'+Y(pts[k+1].hrs).toFixed(1)+'" '
+       + 'stroke="var(--t2)" stroke-width="1.8" stroke-linecap="round"/>';
+  }
+  pts.forEach(function(p,i){
+    if (p.hrs === null) return;
+    s += '<circle cx="'+X(i).toFixed(1)+'" cy="'+Y(p.hrs).toFixed(1)+'" r="3.2" '
+       + 'fill="'+ (p.score ? 'var(--cs'+p.score+')' : 'var(--surface)') +'" '
+       + 'stroke="var(--t2)" stroke-width="1.4"/>';
+  });
+
+  /* date ticks: first, middle, last */
+  [0, Math.floor((n-1)/2), n-1].forEach(function(i, j, arr){
+    if (arr.indexOf(i) !== j) return;
+    s += '<text x="'+X(i).toFixed(1)+'" y="'+(H-6)+'" text-anchor="'
+       + (i===0 ? 'start' : (i===n-1 ? 'end' : 'middle')) +'" '
+       + 'font-size="8" fill="var(--ink-3)">'+ md(pts[i].d) +'</text>';
+  });
+  s += '</svg>';
+
+  s += '<div class="slegend"><span>점 색 = 그날 컨디션</span>'
+     + [1,2,3,4,5].map(function(k2){
+         return '<i class="cs'+k2+'" title="'+CLABEL[k2]+'"></i>'; }).join("")
+     + '<span class="lr">'+ CLABEL[1] +' → '+ CLABEL[5] +'</span></div>';
+  return s;
+}
+
 function ensureDraft(ds){
   if (cdraftDate === ds) return;
   cdraftDate = ds;
@@ -914,6 +995,9 @@ function viewCond(d){
      + '</div>';
   h += '<div class="note" id="dnote">🐙 '+ esc(dayComment(pts, tgt, hrs, src.score, ds)) +'</div>';
   h += '</div>';
+  h += '<div class="card"><h2>수면 추이<em>최근 14일</em></h2>'
+     + sleepChart(d, 14) + '</div>';
+
   h += '<button class="jump" data-act="insights">내 패턴 분석</button>';
   return h;
 }
