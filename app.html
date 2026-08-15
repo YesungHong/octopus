@@ -410,6 +410,41 @@ body{
 .delta.down{color:var(--ink-2);background:var(--sunk)}
 .goalline{text-align:center;font-size:12px;color:var(--ink-3);margin-top:11px;
   font-variant-numeric:tabular-nums}
+
+/* ── insights ─────────────────────────────────────────────────── */
+.need{padding:14px;background:var(--sunk);border-radius:9px;font-size:12.5px;
+  color:var(--ink-3);line-height:1.65;text-align:center}
+.need b{font-family:var(--font-num);font-size:15px;color:var(--ink-2)}
+
+.btable{display:flex;flex-direction:column;gap:1px}
+.brow{display:flex;flex-direction:column;gap:7px;padding:11px 2px;
+  border-bottom:1px solid var(--line-soft)}
+.brow:last-child{border-bottom:0}
+.bl{font-size:13px;font-weight:600;display:flex;align-items:baseline;gap:7px}
+.bl s{text-decoration:none;font-family:var(--font-num);font-size:11px;font-weight:400;color:var(--ink-3)}
+.bv{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.bcell{display:flex;align-items:center;gap:7px;font-size:11.5px;color:var(--ink-3)}
+.bcell.wide{grid-column:1 / -1}
+.bcell span{flex:none;width:34px}
+.bcell u{text-decoration:none;font-family:var(--font-num);font-size:13px;color:var(--ink);
+  font-variant-numeric:tabular-nums;flex:none;width:42px}
+.mbar{flex:1;height:6px;background:var(--sunk);border-radius:3px;overflow:hidden;min-width:24px}
+.mbar i{display:block;height:100%;border-radius:3px;background:var(--ink-3)}
+.mbar i.good{background:var(--good)}
+.mbar i.acc{background:var(--accent)}
+
+.finding{margin-top:16px;padding:15px;border-radius:10px;background:var(--accent-soft);
+  border:1px solid color-mix(in srgb,var(--accent) 35%,transparent)}
+.finding .fk{font-size:10.5px;letter-spacing:.11em;text-transform:uppercase;color:var(--accent-ink)}
+.finding .fv{font-family:var(--font-num);font-size:24px;font-weight:600;margin:5px 0 4px;
+  color:var(--ink);font-variant-numeric:tabular-nums}
+.finding .fs{font-size:11.5px;color:var(--ink-2);font-variant-numeric:tabular-nums}
+
+.cmp2{margin-bottom:16px}
+.cmp2:last-child{margin-bottom:0}
+.cmp2 .ck{font-size:13px;font-weight:600;margin-bottom:8px}
+.cmp2 .cmpline{margin-bottom:1px}
+.cnote{margin-top:8px;font-size:12.5px;color:var(--ink-2);line-height:1.6}
 .arch{display:flex;align-items:center;gap:10px;padding:9px 8px;border-radius:7px;cursor:pointer;font-size:13px}
 .arch:hover{background:var(--surface-2)}
 .arch .w{font-family:var(--font-num);font-size:11.5px;color:var(--ink-3);flex:none;width:44px}
@@ -753,6 +788,7 @@ function viewCond(d){
      + '</div>';
   h += '<div class="note" id="dnote">🐙 '+ esc(dayComment(pts, tgt, hrs, src.score, ds)) +'</div>';
   h += '</div>';
+  h += '<button class="jump" data-act="insights">내 패턴 분석</button>';
   return h;
 }
 function drow(k, v, cls, id){
@@ -808,6 +844,199 @@ function dayComment(pts, tgt, hrs, score, ds){
     else s += " " + hrs.toFixed(1) + "시간 잤어도 피로는 쌓여 있을 수 있어. 무리하지 마.";
   }
   return s;
+}
+
+/* ── 내 패턴 (전체 기록 분석) ──
+   Every section here is gated on having enough days. An "optimal sleep" number
+   derived from four nights is a lie with a decimal point on it, so when the
+   data isn't there we say what's missing instead of inventing a finding. */
+var BANDS = [
+  {lo:0,   hi:5.5, label:"5.5시간 미만"},
+  {lo:5.5, hi:6.5, label:"5.5 – 6.5시간"},
+  {lo:6.5, hi:7.5, label:"6.5 – 7.5시간"},
+  {lo:7.5, hi:8.5, label:"7.5 – 8.5시간"},
+  {lo:8.5, hi:99,  label:"8.5시간 이상"}
+];
+function bandOf(h){
+  for (var i=0;i<BANDS.length;i++) if (h >= BANDS[i].lo && h < BANDS[i].hi) return i;
+  return BANDS.length - 1;
+}
+function condDays(){
+  return Object.keys(S.cond).sort().map(function(ds){
+    var c = S.cond[ds];
+    return { ds: ds, hrs: sleepHours(c), score: c.score || null, pts: ptsOn(ds) };
+  });
+}
+function bar(frac, cls){
+  var w = Math.max(0, Math.min(100, frac*100));
+  return '<div class="mbar"><i class="'+(cls||"")+'" style="width:'+w.toFixed(0)+'%"></i></div>';
+}
+function needLine(have, need, what){
+  return '<div class="need"><b>'+ have +'일</b> / 최소 '+ need +'일 — '+ what +'</div>';
+}
+
+function viewInsights(){
+  var days = condDays();
+  var wSleepCond = days.filter(function(d){ return d.hrs !== null && d.score; });
+  var wCond      = days.filter(function(d){ return d.score; });
+  var wSleep     = days.filter(function(d){ return d.hrs !== null; });
+
+  var h = '<div class="card">';
+  h += '<div class="rep-h"><div class="t">내 패턴</div>'
+     + '<div class="d">기록 '+ days.length +'일</div></div>';
+  h += '<div class="note">🐙 여기 있는 건 전부 네 기록에서 나온 거야. '
+     + '일반적인 권장치가 아니라 <b>너한테</b> 실제로 어땠는지고, '
+     + '그래서 기록이 얇으면 아예 말을 안 해.</div></div>';
+
+  /* 1 — 수면 구간별 컨디션 & 성취 */
+  h += '<div class="card"><h2>수면 시간에 따라</h2>';
+  if (wSleep.length < 5){
+    h += needLine(wSleep.length, 5, "수면을 적은 날이 이만큼 모이면 구간별로 보여줄게");
+  } else {
+    var rows = BANDS.map(function(b,i){
+      var inB = wSleep.filter(function(d){ return bandOf(d.hrs) === i; });
+      var sc  = mean(inB.map(function(d){ return d.score; }).filter(Boolean));
+      var pt  = mean(inB.map(function(d){ return d.pts; }));
+      return { b:b, n:inB.length, sc:sc, pt:pt };
+    }).filter(function(r){ return r.n > 0; });
+
+    h += '<div class="btable">';
+    rows.forEach(function(r){
+      h += '<div class="brow"><div class="bl">'+ r.b.label +'<s>'+ r.n +'일</s></div>'
+         + '<div class="bv">'
+         +   '<div class="bcell"><span>컨디션</span>'
+         +     (r.sc === null ? '<u>—</u>' : '<u>'+ r.sc.toFixed(1) +'</u>' + bar(r.sc/5, "good")) +'</div>'
+         +   '<div class="bcell"><span>성취</span><u>'+ r.pt.toFixed(1) +'pt</u>'
+         +     bar(r.pt / Math.max(1, S.dailyTarget), "acc") +'</div>'
+         + '</div></div>';
+    });
+    h += '</div>';
+
+    /* 2 — best band, only when a band is actually populated */
+    var solid = rows.filter(function(r){ return r.n >= 4 && r.sc !== null; });
+    if (solid.length >= 2 && wSleepCond.length >= 10){
+      var best = solid.slice().sort(function(a,b){ return b.sc - a.sc; })[0];
+      h += '<div class="finding"><div class="fk">네 기록상 가장 좋았던 구간</div>'
+         + '<div class="fv">'+ best.b.label +'</div>'
+         + '<div class="fs">컨디션 평균 '+ best.sc.toFixed(1) +' / 5 · 성취 평균 '
+         + best.pt.toFixed(1) +'pt · '+ best.n +'일 기준</div></div>';
+    } else {
+      h += needLine(wSleepCond.length, 10, "수면+컨디션이 같이 있는 날이 10일 넘고, 두 구간에 각각 4일 이상 모여야 '가장 좋았던 구간'을 말할 수 있어");
+    }
+  }
+  h += '</div>';
+
+  /* 3 — 컨디션별 성취 */
+  h += '<div class="card"><h2>컨디션에 따라</h2>';
+  if (wCond.length < 5){
+    h += needLine(wCond.length, 5, "컨디션을 적은 날이 이만큼 모이면 보여줄게");
+  } else {
+    h += '<div class="btable">';
+    [5,4,3,2,1].forEach(function(k){
+      var inK = wCond.filter(function(d){ return d.score === k; });
+      if (!inK.length) return;
+      var pt = mean(inK.map(function(d){ return d.pts; }));
+      h += '<div class="brow"><div class="bl">'+ CLABEL[k] +'<s>'+ inK.length +'일</s></div>'
+         + '<div class="bv"><div class="bcell wide"><u>'+ pt.toFixed(1) +'pt</u>'
+         + bar(pt / Math.max(1, S.dailyTarget), "acc") +'</div></div></div>';
+    });
+    h += '</div>';
+  }
+  h += '</div>';
+
+  /* 4 — 무리한 다음에 오는 것 */
+  h += '<div class="card"><h2>무리한 다음날</h2>';
+  if (wCond.length < 8){
+    h += needLine(wCond.length, 8, "컨디션 기록이 이만큼 쌓이면 누적 피로를 볼 수 있어");
+  } else {
+    var out = [];
+
+    /* 직전 3일 부하 */
+    var loaded = wCond.map(function(d){
+      var dt = parseISO(d.ds), s = 0;
+      for (var k=1;k<=3;k++) s += ptsOn(iso(addDays(dt,-k)));
+      return { score:d.score, load:s };
+    });
+    var medLoad = median(loaded.map(function(x){ return x.load; }));
+    var hiL = loaded.filter(function(x){ return x.load >  medLoad; });
+    var loL = loaded.filter(function(x){ return x.load <= medLoad; });
+    if (hiL.length >= 3 && loL.length >= 3){
+      out.push({
+        k: "직전 3일을 많이 달린 뒤",
+        a: mean(hiL.map(function(x){ return x.score; })),
+        b: mean(loL.map(function(x){ return x.score; })),
+        la: "많이 달린 뒤 ("+ medLoad.toFixed(0) +"pt 초과)",
+        lb: "적게 달린 뒤"
+      });
+    }
+
+    /* 직전 3일 수면 */
+    var slept = wCond.map(function(d){
+      var dt = parseISO(d.ds), arr = [];
+      for (var k=1;k<=3;k++){
+        var cc = condOn(iso(addDays(dt,-k)));
+        var hh = sleepHours(cc);
+        if (hh !== null) arr.push(hh);
+      }
+      return { score:d.score, avg: arr.length ? mean(arr) : null };
+    }).filter(function(x){ return x.avg !== null; });
+    if (slept.length >= 6){
+      var medS = median(slept.map(function(x){ return x.avg; }));
+      var hiS = slept.filter(function(x){ return x.avg >= medS; });
+      var loS = slept.filter(function(x){ return x.avg <  medS; });
+      if (hiS.length >= 2 && loS.length >= 2){
+        out.push({
+          k: "직전 3일 수면",
+          a: mean(hiS.map(function(x){ return x.score; })),
+          b: mean(loS.map(function(x){ return x.score; })),
+          la: medS.toFixed(1) +"시간 이상 잔 뒤",
+          lb: medS.toFixed(1) +"시간 미만 잔 뒤"
+        });
+      }
+    }
+
+    /* 연속으로 움직인 날 */
+    var streaked = wCond.map(function(d){
+      var dt = parseISO(d.ds), run = 0;
+      for (var k=1;k<=7;k++){
+        if (ptsOn(iso(addDays(dt,-k))) > 0) run++; else break;
+      }
+      return { score:d.score, run:run };
+    });
+    var hiR = streaked.filter(function(x){ return x.run >= 3; });
+    var loR = streaked.filter(function(x){ return x.run <  3; });
+    if (hiR.length >= 3 && loR.length >= 3){
+      out.push({
+        k: "쉬는 날 없이 이어간 뒤",
+        a: mean(hiR.map(function(x){ return x.score; })),
+        b: mean(loR.map(function(x){ return x.score; })),
+        la: "3일 이상 연속 뒤",
+        lb: "중간에 쉰 뒤"
+      });
+    }
+
+    if (!out.length){
+      h += needLine(wCond.length, 8, "기록은 충분한데 아직 뚜렷한 갈림이 안 보여. 조금 더 쌓이면 나올 거야");
+    } else {
+      out.forEach(function(o){
+        var drop = o.b - o.a;
+        h += '<div class="cmp2"><div class="ck">'+ o.k +'</div>'
+           + '<div class="cmpline"><span>'+ o.la +'</span><b>'+ o.a.toFixed(1) +'</b></div>'
+           + '<div class="cmpline"><span>'+ o.lb +'</span><b>'+ o.b.toFixed(1) +'</b></div>'
+           + '<div class="cnote">'
+           +   (Math.abs(drop) < 0.3
+                 ? '차이가 거의 없어 — 이건 네 컨디션을 흔드는 요인이 아닌 것 같아.'
+                 : (drop > 0
+                     ? '컨디션이 '+ drop.toFixed(1) +'점 낮아져. 여기가 네 피로가 쌓이는 지점이야.'
+                     : '오히려 '+ Math.abs(drop).toFixed(1) +'점 높아. 이건 너한테 잘 맞는 리듬인 듯.'))
+           + '</div></div>';
+      });
+    }
+  }
+  h += '</div>';
+
+  h += '<div class="foot"><button data-act="closeinsights">돌아가기</button></div>';
+  return h;
 }
 
 /* ── 어제와 비교 ──
@@ -1608,6 +1837,10 @@ function doAct(act, n){
     }
     return;
   }
+  if (act === "insights"){
+    el("view").innerHTML = viewInsights(); wire(); window.scrollTo(0,0); return;
+  }
+  if (act === "closeinsights"){ view = "cond"; render(); window.scrollTo(0,0); return; }
   if (act === "compare"){
     el("view").innerHTML = viewCompare(cursorDay());
     wire(); window.scrollTo(0,0); return;
