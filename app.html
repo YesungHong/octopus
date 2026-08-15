@@ -459,10 +459,15 @@ body{
 .cmp2 .cd{font-size:12px;color:var(--ink-3);line-height:1.6;margin-bottom:11px}
 .cmp2 .cmpline{margin-bottom:1px}
 .cmpline b s{text-decoration:none;font-size:10.5px;color:var(--ink-3);margin-left:2px}
-.cnote{margin-top:10px;font-size:12.5px;color:var(--ink-2);line-height:1.6;
-  padding:10px 12px;border-radius:8px;background:var(--sunk)}
+.cnote{margin-top:10px;font-size:13px;color:var(--ink-2);line-height:1.75;
+  padding:13px 14px;border-radius:9px;background:var(--sunk)}
+.cnote b{font-weight:650;color:var(--ink)}
+.cnote em{display:block;margin-top:8px;font-style:normal;font-family:var(--font-num);
+  font-size:10.5px;color:var(--ink-3);font-variant-numeric:tabular-nums;opacity:.85}
 .cnote.warn{background:var(--accent-soft);color:var(--accent-ink)}
+.cnote.warn b{color:var(--accent-ink)}
 .cnote.ok{background:var(--good-soft);color:var(--good)}
+.cnote.ok b{color:var(--good)}
 .arch{display:flex;align-items:center;gap:10px;padding:9px 8px;border-radius:7px;cursor:pointer;font-size:13px}
 .arch:hover{background:var(--surface-2)}
 .arch .w{font-family:var(--font-num);font-size:11.5px;color:var(--ink-3);flex:none;width:44px}
@@ -898,6 +903,82 @@ function trust(n, strong, what){
        + '<s>'+ what +' '+ n +'일 · '+ strong +'일쯤부터 안정적이야</s></div>';
 }
 
+/* Say what kind of person the numbers suggest, not what the numbers are.
+   Each analysis has its own direction of "risk", so they're handled separately
+   rather than through one shared delta — for sleep, the higher group is the
+   good one; for load and streaks, the higher group is the one that costs. */
+function verdict(type, a, b){
+  var FLAT = 0.3;
+  var gap, strong, out = {};
+
+  if (type === "load"){
+    gap = b - a;                       /* a=몰아서 한 뒤, b=여유로웠던 뒤 */
+    strong = gap >= 0.8;
+    if (gap > FLAT){
+      out.cls = "warn";
+      out.t = "너는 <b>몰아서 하면 반동이 오는 타입</b>이야. "
+            + "며칠 달리고 나면 그 대가가 컨디션으로 돌아와" + (strong ? ", 그것도 꽤 뚜렷하게" : "") + ". "
+            + "큰 거 하나 끝낸 다음 날은 처음부터 가볍게 잡아두는 게 너한테 맞아 — "
+            + "그게 게으른 게 아니라 네 몸이 실제로 그렇게 생긴 거야.";
+    } else if (gap < -FLAT){
+      out.cls = "ok";
+      out.t = "너는 <b>달릴수록 붙는 타입</b>이야. 몰아서 한 뒤가 오히려 컨디션이 좋게 나와. "
+            + "리듬이 한번 잡히면 그게 힘이 되는 사람인 거지. "
+            + "다만 이건 아직 한계 전 구간이라 그럴 수도 있으니, 기록이 더 쌓이면 다시 보자.";
+    } else {
+      out.cls = "";
+      out.t = "몰아서 하든 여유롭든 컨디션이 비슷해. "
+            + "적어도 지금 기록에선 <b>일의 양이 네 컨디션을 좌우하지 않아</b>. "
+            + "컨디션이 흔들린다면 원인은 다른 데 있을 거야 — 잠이라든지.";
+    }
+  }
+
+  else if (type === "sleep"){
+    gap = a - b;                       /* a=잘 자고 온 날, b=덜 자고 온 날 */
+    strong = gap >= 0.8;
+    if (gap > FLAT){
+      out.cls = "warn";
+      out.t = "너는 <b>잠이 컨디션을 좌우하는 타입</b>이야" + (strong ? ", 그것도 아주 확실하게" : "") + ". "
+            + "며칠 잘 자두면 그게 그대로 몸 상태로 나와. "
+            + "바쁠 때 제일 먼저 깎게 되는 게 잠인데, 너한테는 그게 제일 비싼 선택이야.";
+    } else if (gap < -FLAT){
+      out.cls = "";
+      out.t = "덜 잔 뒤가 오히려 컨디션이 좋게 나왔어. 흔한 결과가 아니라 "
+            + "<b>아직 믿기엔 이른 숫자</b>야 — 바쁘고 신났던 시기에 잠도 줄고 컨디션도 좋게 느껴진, "
+            + "그런 며칠이 섞였을 수 있어. 기록이 더 쌓이면 뒤집힐 가능성이 커.";
+    } else {
+      out.cls = "";
+      out.t = "잘 잔 뒤나 덜 잔 뒤나 컨디션이 비슷해. "
+            + "지금 기록에선 <b>수면 시간이 컨디션을 가르는 요인은 아니야</b>. "
+            + "다만 수면 기록이 얇으면 차이가 안 보일 수도 있어.";
+    }
+  }
+
+  else {                               /* streak — a=안 쉬고 온 날, b=쉬어가며 온 날 */
+    gap = b - a;
+    strong = gap >= 0.8;
+    if (gap > FLAT){
+      out.cls = "warn";
+      out.t = "너는 <b>쉬는 날이 실제로 필요한 타입</b>이야. "
+            + "안 쉬고 이어가면 컨디션이 눈에 띄게 내려가" + (strong ? ", 차이가 작지 않아" : "") + ". "
+            + "일주일에 하루쯤 비워두는 게 손해처럼 보이지만, 네 기록상으로는 그게 결국 더 많이 하게 되는 길이야.";
+    } else if (gap < -FLAT){
+      out.cls = "ok";
+      out.t = "쉬지 않고 이어갈 때 컨디션이 오히려 좋아. "
+            + "너는 <b>흐름이 끊기는 쪽을 더 힘들어하는 타입</b>인 것 같아. "
+            + "다만 원래 컨디션이 안 좋아서 쉰 날이 많았다면 그 때문에 이렇게 보일 수도 있어.";
+    } else {
+      out.cls = "";
+      out.t = "연속으로 하든 중간에 쉬든 컨디션이 비슷해. "
+            + "<b>연속 여부는 너한테 큰 변수가 아닌</b> 것 같아. 쉬고 싶을 때 쉬어도 된다는 뜻이기도 하고.";
+    }
+  }
+
+  out.sub = a.toFixed(1) + " vs " + b.toFixed(1)
+          + " · 차이 " + Math.abs(a-b).toFixed(1) + "점";
+  return out;
+}
+
 function viewInsights(){
   var days = condDays();
   var wSleepCond = days.filter(function(d){ return d.hrs !== null && d.score; });
@@ -992,6 +1073,7 @@ function viewInsights(){
     var loL = loaded.filter(function(x){ return x.load <= medLoad; });
     if (hiL.length >= 2 && loL.length >= 2){
       out.push({
+        type: "load",
         q: "며칠 몰아서 하면, 그 다음에 지칠까?",
         d: "컨디션을 적은 날마다 <b>그 앞 3일에 얼마나 했는지</b>를 세어서, "
          + "몰아서 한 뒤에 온 날들과 여유롭게 보낸 뒤에 온 날들의 컨디션을 비교했어.",
@@ -1018,6 +1100,7 @@ function viewInsights(){
       var loS = slept.filter(function(x){ return x.avg <  medS; });
       if (hiS.length >= 2 && loS.length >= 2){
         out.push({
+          type: "sleep",
           q: "잠이 며칠 모자라면, 컨디션이 무너질까?",
           d: "컨디션을 적은 날마다 <b>그 앞 3일을 평균 몇 시간 잤는지</b>를 보고, "
            + "잘 자고 온 날들과 덜 자고 온 날들의 컨디션을 비교했어.",
@@ -1041,6 +1124,7 @@ function viewInsights(){
     var loR = streaked.filter(function(x){ return x.run <  3; });
     if (hiR.length >= 2 && loR.length >= 2){
       out.push({
+        type: "streak",
         q: "쉬는 날 없이 이어가면, 어떻게 될까?",
         d: "컨디션을 적은 날마다 <b>그 앞에 며칠을 안 쉬고 달려왔는지</b>를 세서, "
          + "3일 넘게 이어온 날들과 중간에 쉬어간 날들의 컨디션을 비교했어.",
@@ -1055,18 +1139,13 @@ function viewInsights(){
       h += '<div class="need">아직 갈림이 안 보여. 며칠 더 쌓이면 나올 거야.</div>';
     } else {
       out.forEach(function(o){
-        var drop = o.b - o.a;
+        var v = verdict(o.type, o.a, o.b);
         h += '<div class="cmp2"><div class="ck">'+ o.q +'</div>'
            + '<div class="cd">'+ o.d +'</div>'
            + '<div class="cmpline"><span>'+ o.la +'</span><b>'+ o.a.toFixed(1) +'<s>/5</s></b></div>'
            + '<div class="cmpline"><span>'+ o.lb +'</span><b>'+ o.b.toFixed(1) +'<s>/5</s></b></div>'
-           + '<div class="cnote'+ (Math.abs(drop) < 0.3 ? '' : (drop > 0 ? ' warn' : ' ok')) +'">'
-           +   (Math.abs(drop) < 0.3
-                 ? '→ 차이가 거의 없어. 이건 네 컨디션을 흔드는 요인이 아닌 것 같아.'
-                 : (drop > 0
-                     ? '→ 컨디션이 '+ drop.toFixed(1) +'점 낮아져. 여기가 네 피로가 쌓이는 지점이야.'
-                     : '→ 오히려 '+ Math.abs(drop).toFixed(1) +'점 높아. 이건 너한테 잘 맞는 리듬인 것 같아.'))
-           + '</div></div>';
+           + '<div class="cnote'+ (v.cls ? ' '+v.cls : '') +'">'+ v.t
+           +   '<em>'+ v.sub +'</em></div></div>';
       });
     }
   }
