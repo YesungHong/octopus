@@ -98,7 +98,7 @@ body{
 .mast .per{font-family:var(--font-num);font-size:12px;color:var(--ink-3);font-variant-numeric:tabular-nums}
 
 /* ── tabs ─────────────────────────────────────────────────────── */
-.tabs{display:grid;grid-template-columns:repeat(3,1fr);gap:2px;background:var(--sunk);
+.tabs{display:grid;grid-template-columns:repeat(4,1fr);gap:2px;background:var(--sunk);
   padding:3px;border-radius:9px;margin-bottom:18px}
 .tabs button{
   appearance:none;border:0;background:transparent;color:var(--ink-3);
@@ -300,6 +300,63 @@ body{
 .setrow input:focus{outline:0;border-color:var(--accent)}
 .setrow small{display:block;color:var(--ink-3);font-size:11.5px;margin-top:2px}
 
+/* ── condition tab ────────────────────────────────────────────── */
+.timegrid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.timegrid label{display:flex;flex-direction:column;gap:6px;font-size:11.5px;
+  letter-spacing:.06em;color:var(--ink-3)}
+.timegrid input{background:var(--bg);border:1px solid var(--line);border-radius:9px;
+  padding:11px 12px;color:var(--ink);font-family:var(--font-num);font-size:17px;
+  font-variant-numeric:tabular-nums;width:100%;min-height:46px}
+.timegrid input:focus{outline:0;border-color:var(--accent)}
+
+.sleepbig{margin-top:14px;padding:14px;background:var(--sunk);border-radius:10px;
+  display:flex;align-items:baseline;justify-content:center;gap:5px}
+.sleepbig b{font-family:var(--font-num);font-size:34px;font-weight:600;letter-spacing:-.02em;
+  font-variant-numeric:tabular-nums;color:var(--ink)}
+.sleepbig em{font-style:normal;font-size:14px;color:var(--ink-3)}
+.sleepbig .none{font-size:12.5px;color:var(--ink-3)}
+
+.condpick{display:grid;grid-template-columns:repeat(5,1fr);gap:5px}
+.condpick button{appearance:none;border:1px solid var(--line);background:var(--bg);
+  color:var(--ink-3);font-family:inherit;font-size:11px;font-weight:600;
+  padding:10px 2px 9px;border-radius:9px;cursor:pointer;transition:.13s;
+  display:flex;flex-direction:column;align-items:center;gap:6px;
+  -webkit-tap-highlight-color:transparent}
+.condpick button i{width:11px;height:11px;border-radius:50%;display:block}
+.condpick i.c1{background:var(--t1)} .condpick i.c2{background:#8E9AA0}
+.condpick i.c3{background:var(--t2)} .condpick i.c4{background:#4E9A7E}
+.condpick i.c5{background:var(--good)}
+.condpick button:hover{border-color:var(--ink-3);color:var(--ink)}
+.condpick button[aria-pressed="true"]{background:var(--surface-2);border-color:var(--accent);
+  color:var(--ink);box-shadow:0 0 0 2px var(--accent-soft)}
+.condpick button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+.drep{display:flex;flex-direction:column;gap:1px}
+.drow{display:flex;align-items:baseline;gap:12px;padding:10px 2px;
+  border-bottom:1px solid var(--line-soft)}
+.drow:last-child{border-bottom:0}
+.drow .k{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-3);
+  width:62px;flex:none}
+.drow .v{font-family:var(--font-num);font-size:15px;font-variant-numeric:tabular-nums}
+.drow .v s{text-decoration:none;color:var(--ink-3);font-size:11.5px;margin-left:6px}
+.drow.good .v{color:var(--good);font-weight:600}
+
+/* ── sleep vs output, in the weekly report ────────────────────── */
+.cmp{display:flex;flex-direction:column;gap:1px;margin:12px 0 4px}
+.cmpline{display:flex;align-items:center;justify-content:space-between;gap:12px;
+  padding:11px 12px;background:var(--sunk);border-radius:8px;font-size:13px;color:var(--ink-2)}
+.cmpline b{font-family:var(--font-num);font-size:16px;color:var(--ink);font-variant-numeric:tabular-nums}
+.cmpline:first-child b{color:var(--good)}
+
+.slist{display:flex;flex-direction:column;gap:1px;margin-top:12px}
+.sline{display:grid;grid-template-columns:28px 1fr 1fr 56px;align-items:center;gap:8px;
+  padding:8px 2px;border-bottom:1px solid var(--line-soft);font-size:12.5px}
+.sline:last-child{border-bottom:0}
+.sline .d{color:var(--ink-3);font-weight:600}
+.sline .s,.sline .p{font-family:var(--font-num);font-variant-numeric:tabular-nums}
+.sline .p{text-align:right;color:var(--ink-2)}
+.sline .c{color:var(--ink-3)}
+
 /* ── report ───────────────────────────────────────────────────── */
 .rep-h{display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin-bottom:16px}
 .rep-h .t{font-size:16px;font-weight:650}
@@ -343,6 +400,7 @@ body{
   <div id="storewarn" class="warn hide"></div>
 
   <div class="tabs" role="tablist">
+    <button role="tab" data-v="cond" aria-selected="false">컨디션</button>
     <button role="tab" data-v="day"  aria-selected="true">일간</button>
     <button role="tab" data-v="week" aria-selected="false">주간</button>
     <button role="tab" data-v="all"  aria-selected="false">전체</button>
@@ -390,6 +448,8 @@ function blank(){
     weeklyTarget: 35,
     tasks: [],
     log: {},                                     /* "YYYY-MM-DD": { taskId: true } */
+    cond: {},                                    /* "YYYY-MM-DD": {sleep:"23:30", wake:"07:10", score:1..5}
+                                                    filed under the date you WOKE UP */
     rewards: [ {pct:25,text:"",claimed:false},
                {pct:50,text:"",claimed:false},
                {pct:75,text:"",claimed:false},
@@ -451,6 +511,37 @@ function paintWarn(){
   if (storageOK){ el.classList.add("hide"); return; }
   el.classList.remove("hide");
   el.textContent = "이 브라우저에 저장이 막혀 있어. 대신 주소창에 데이터를 싣고 있으니, 이 페이지를 즐겨찾기 해두면 기록이 남아.";
+}
+
+/* ───────── sleep & condition ───────── */
+var CLABEL = {1:"지침", 2:"별로", 3:"보통", 4:"괜찮음", 5:"좋음"};
+
+/* hours slept, wrapping past midnight; null when either end is missing */
+function sleepHours(c){
+  if (!c || !c.sleep || !c.wake) return null;
+  var a = c.sleep.split(":"), b = c.wake.split(":");
+  var s = (+a[0])*60 + (+a[1]), w = (+b[0])*60 + (+b[1]);
+  var mins = w - s;
+  if (mins <= 0) mins += 1440;
+  return Math.round(mins/6)/10;
+}
+function condOn(ds){ return S.cond[ds] || null; }
+function setCond(ds, key, val){
+  if (!S.cond[ds]) S.cond[ds] = {};
+  if (val === null || val === "") delete S.cond[ds][key];
+  else S.cond[ds][key] = val;
+  if (!Object.keys(S.cond[ds]).length) delete S.cond[ds];
+}
+function mean(arr){
+  var v = arr.filter(function(x){ return x !== null && x !== undefined; });
+  if (!v.length) return null;
+  return v.reduce(function(a,b){ return a+b; },0) / v.length;
+}
+function median(arr){
+  var v = arr.filter(function(x){ return x !== null && x !== undefined; }).slice().sort(function(a,b){ return a-b; });
+  if (!v.length) return null;
+  var m = Math.floor(v.length/2);
+  return v.length % 2 ? v[m] : (v[m-1]+v[m])/2;
 }
 
 /* ───────── scoring ───────── */
@@ -533,10 +624,90 @@ function render(){
     b.setAttribute("aria-selected", b.dataset.v === view ? "true" : "false");
   });
   var v = el("view");
+  if (view === "cond") v.innerHTML = viewCond(cursorDay());
   if (view === "day")  v.innerHTML = viewDay(cursorDay());
   if (view === "week") v.innerHTML = viewWeek(cursorWeek());
   if (view === "all")  v.innerHTML = viewAll();
   wire();
+}
+
+/* shared by 컨디션 and 일간 — both ride the same date cursor */
+function dayNav(d){
+  var isToday = iso(d) === iso(today()), ahead = dayOffset > 0;
+  var s = '<div class="datenav">'
+    + '<button data-act="prevday" aria-label="이전 날">‹</button>'
+    + '<div class="dlabel">'+ md(d) +' <span>('+ DOW[d.getDay()] +')</span>'
+    +   (isToday ? '<b>오늘</b>' : (ahead ? '<b class="soon">예정</b>' : '')) +'</div>'
+    + '<button data-act="nextday" aria-label="다음 날">›</button>'
+    + '</div>';
+  if (!isToday){
+    s += '<button class="jump" data-act="jumptoday">오늘로 돌아가기 <em>'
+       + (ahead ? "+"+dayOffset : dayOffset) + '일</em></button>';
+  }
+  return s;
+}
+
+/* ── 컨디션 ── */
+function viewCond(d){
+  var ds = iso(d), c = condOn(ds) || {};
+  var hrs = sleepHours(c);
+  var pts = ptsOn(ds), tgt = S.dailyTarget;
+
+  var h = '<div class="card">';
+  h += dayNav(d);
+
+  h += '<h2>잠</h2>';
+  h += '<div class="timegrid">'
+     + '<label>잠든 시각<input type="time" id="cSleep" value="'+ (c.sleep||"") +'"></label>'
+     + '<label>일어난 시각<input type="time" id="cWake" value="'+ (c.wake||"") +'"></label>'
+     + '</div>';
+  h += '<div class="sleepbig">'
+     + (hrs === null
+         ? '<span class="none">두 시각을 넣으면 수면 시간이 계산돼</span>'
+         : '<b>'+ hrs.toFixed(1) +'</b><em>시간</em>')
+     + '</div>';
+
+  h += '<h2 class="mt">컨디션</h2>';
+  h += '<div class="condpick">'
+     + [1,2,3,4,5].map(function(k){
+         return '<button data-act="score" data-s="'+k+'" aria-pressed="'+(c.score===k)+'">'
+              + '<i class="c'+k+'"></i>'+ CLABEL[k] +'</button>';
+       }).join("")
+     + '</div>';
+  if (c.score){
+    h += '<button class="jump" data-act="clearscore">컨디션 기록 지우기</button>';
+  }
+  h += '</div>';
+
+  /* 하루 보고서 */
+  h += '<div class="card"><h2>하루 보고서</h2>';
+  h += '<div class="drep">'
+     + drow("퀘스트", pts + ' / ' + tgt + ' pt', pts >= tgt ? "good" : "")
+     + drow("수면", hrs === null ? "—" : hrs.toFixed(1) + '시간'
+            + (c.sleep && c.wake ? ' <s>'+c.sleep+' → '+c.wake+'</s>' : ''), "")
+     + drow("컨디션", c.score ? CLABEL[c.score] : "—", "")
+     + '</div>';
+  h += '<div class="note">🐙 '+ esc(dayComment(pts, tgt, hrs, c.score, ds)) +'</div>';
+  h += '</div>';
+  return h;
+}
+function drow(k, v, cls){
+  return '<div class="drow'+(cls?' '+cls:'')+'"><div class="k">'+ k +'</div><div class="v">'+ v +'</div></div>';
+}
+
+function dayComment(pts, tgt, hrs, score, ds){
+  var future = ds > iso(today());
+  if (future) return "아직 오지 않은 날이야. 미리 퀘스트만 얹어둬도 돼.";
+  if (!pts && hrs === null && !score) return "아직 아무 기록도 없어. 잠부터 적어도 되고, 퀘스트부터 해도 돼.";
+  var s = "";
+  if (pts >= tgt) s = "오늘 목표 찍었어. 남은 시간은 온전히 네 거야.";
+  else if (pts > 0) s = pts + "pt 쌓였어.";
+  else s = "오늘은 기록만 남겼네. 그것도 남긴 거야.";
+  if (hrs !== null){
+    if (hrs < 6) s += " 잠이 " + hrs.toFixed(1) + "시간이었네 — 오늘 기대치는 좀 낮춰도 괜찮아.";
+    else if (hrs >= 8) s += " " + hrs.toFixed(1) + "시간 잤으면 잘 쉰 거야.";
+  }
+  return s;
 }
 
 /* ── 일간 ── */
@@ -564,18 +735,8 @@ function viewDay(d){
   var left = tgt - got;
 
   var isToday = ds === iso(today());
-  var ahead   = dayOffset > 0;
   var h = '<div class="card">';
-  h += '<div class="datenav">'
-     + '<button data-act="prevday" aria-label="이전 날">‹</button>'
-     + '<div class="dlabel">'+ md(d) +' <span>('+ DOW[d.getDay()] +')</span>'
-     +   (isToday ? '<b>오늘</b>' : (ahead ? '<b class="soon">예정</b>' : '')) +'</div>'
-     + '<button data-act="nextday" aria-label="다음 날">›</button>'
-     + '</div>';
-  if (!isToday){
-    h += '<button class="jump" data-act="jumptoday">오늘로 돌아가기'
-       + ' <em>' + (ahead ? "+"+dayOffset : dayOffset) + '일</em></button>';
-  }
+  h += dayNav(d);
   h += '<div class="readout"><div class="big">'+ got +'<em>/'+ tgt +' pt</em></div>'
      +  '<div class="side">완료 <b>'+ doneList.length +'</b> / '+ list.length +'개<br>'
      +  (hit ? '초과 <b>+'+ (got-tgt) +'</b> pt' : '남은 <b>'+ left +'</b> pt') +'</div></div>';
@@ -846,8 +1007,12 @@ function viewSettings(){
 /* ── 보고서 ── */
 function buildReport(ws){
   var byDay = [], total = 0, tiers = {1:0,2:0,3:0}, oncesDone = [];
+  var sleep = [], cond = [];
   for (var i=0;i<7;i++){
     var ds = iso(addDays(ws,i)), m = S.log[ds] || {}, p = 0;
+    var cc = condOn(ds);
+    sleep.push(sleepHours(cc));
+    cond.push(cc && cc.score ? cc.score : null);
     for (var id in m){
       var t = taskById(id);
       if (!t) continue;
@@ -864,7 +1029,7 @@ function buildReport(ws){
   return {
     wno: weekNo(ws), key: weekKey(ws),
     range: md(ws) + " → " + md(addDays(ws,6)),
-    total: total, byDay: byDay, tiers: tiers,
+    total: total, byDay: byDay, tiers: tiers, sleep: sleep, cond: cond,
     hits: byDay.filter(function(p){ return p >= S.dailyTarget; }).length,
     target: S.weeklyTarget,
     routines: routines, onces: oncesDone,
@@ -901,8 +1066,48 @@ function viewReport(r, prev, isPreview){
      + '<div class="stat"><div class="k">한 번짜리</div><div class="v">'+ r.onces.length +'<small>개 완료</small></div></div>'
      + '</div>';
 
+  /* sleep ↔ output. Split at the week's own median so it always says something
+     real, instead of an arbitrary "7 hours" that some weeks never cross. */
+  var sl = r.sleep || [], cd = r.cond || [];
+  var haveSleep = sl.filter(function(x){ return x !== null && x !== undefined; }).length;
+  if (haveSleep){
+    var avgS = mean(sl), avgC = mean(cd);
+    h += '<h2 class="mt">잠과 성취</h2>';
+    h += '<div class="stats">'
+       + '<div class="stat"><div class="k">평균 수면</div><div class="v">'+ avgS.toFixed(1) +'<small>시간</small></div></div>'
+       + '<div class="stat"><div class="k">평균 컨디션</div><div class="v">'
+       +   (avgC === null ? '—' : avgC.toFixed(1) + '<small>/ 5</small>') +'</div></div>'
+       + '</div>';
+
+    if (haveSleep >= 3){
+      var med = median(sl), hi = [], lo = [];
+      sl.forEach(function(x,i){
+        if (x === null || x === undefined) return;
+        (x >= med ? hi : lo).push(r.byDay[i]);
+      });
+      if (hi.length && lo.length){
+        h += '<div class="cmp">'
+           + '<div class="cmpline"><span>'+ med.toFixed(1) +'시간 이상 잔 날</span>'
+           +   '<b>'+ mean(hi).toFixed(1) +' pt</b></div>'
+           + '<div class="cmpline"><span>'+ med.toFixed(1) +'시간 미만 잔 날</span>'
+           +   '<b>'+ mean(lo).toFixed(1) +' pt</b></div>'
+           + '</div>';
+      }
+    }
+
+    h += '<div class="slist">';
+    sl.forEach(function(x,i){
+      if (x === null && r.byDay[i] === 0 && !cd[i]) return;
+      h += '<div class="sline"><div class="d">'+ DOW[i] +'</div>'
+         + '<div class="s">'+ (x === null ? '—' : x.toFixed(1)+'h') +'</div>'
+         + '<div class="c">'+ (cd[i] ? CLABEL[cd[i]] : '—') +'</div>'
+         + '<div class="p">'+ r.byDay[i] +' pt</div></div>';
+    });
+    h += '</div>';
+  }
+
   if (r.routines.length){
-    h += '<h2>루틴 이행</h2><div class="list">';
+    h += '<h2 class="mt">루틴 이행</h2><div class="list">';
     r.routines.forEach(function(x){
       h += '<div class="row" style="cursor:default"><div class="ttl">'+ esc(x.title) +'</div>'
          + '<div class="rate">'+ x.did +'/'+ x.plan +'</div></div>';
@@ -1062,6 +1267,16 @@ function wire(){
     });
   }
 
+  /* sleep clocks — commit on change, not on every keystroke, so focus survives */
+  ["cSleep","cWake"].forEach(function(id){
+    var box = el(id);
+    if (!box) return;
+    box.addEventListener("change", function(){
+      setCond(iso(cursorDay()), id === "cSleep" ? "sleep" : "wake", box.value);
+      save(); render();
+    });
+  });
+
   var sdt = el("sdt"), swt = el("swt");
   if (sdt){
     sdt.addEventListener("change", function(){
@@ -1153,6 +1368,15 @@ function doAct(act, n){
     } else fallbackCopy(url);
     return;
   }
+  if (act === "score"){
+    var sds = iso(cursorDay()), cur = condOn(sds);
+    var val = +n.dataset.s;
+    setCond(sds, "score", (cur && cur.score === val) ? null : val);
+    save(); render(); return;
+  }
+  if (act === "clearscore"){
+    setCond(iso(cursorDay()), "score", null); save(); render(); return;
+  }
   if (act === "prevday"){ if (dayOffset > -3650){ dayOffset--; render(); } return; }
   if (act === "nextday"){ if (dayOffset <  365){ dayOffset++; render(); } return; }
   if (act === "jumptoday"){ dayOffset = 0; render(); return; }
@@ -1200,8 +1424,13 @@ function render2(what){
 /* ───────── boot ───────── */
 document.querySelectorAll(".tabs button").forEach(function(b){
   b.addEventListener("click", function(){
-    view = b.dataset.v; pendingReport = null;
-    dayOffset = 0; weekOffset = 0; editingId = null; render();
+    var prev = view;
+    view = b.dataset.v; pendingReport = null; editingId = null;
+    /* 컨디션 ↔ 일간 share a date, so keep the cursor when moving between them */
+    var dayPair = (prev === "cond" || prev === "day") && (view === "cond" || view === "day");
+    if (!dayPair) dayOffset = 0;
+    weekOffset = 0;
+    render();
   });
 });
 
