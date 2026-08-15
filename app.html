@@ -262,23 +262,6 @@ body{
 
 .empty{padding:22px 8px;text-align:center;color:var(--ink-3);font-size:13px;line-height:1.7}
 
-/* ── routine block: title line + tappable weekday chips ───────── */
-.rtn{display:flex;flex-direction:column;gap:9px;padding:11px 8px 13px;border-radius:8px;
-  border-bottom:1px solid var(--line-soft)}
-.rtn:last-child{border-bottom:0}
-.rtn .top{display:flex;align-items:center;gap:11px}
-.rtn .top .ttl{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:14px}
-.rtn .chips{display:flex;gap:5px;align-items:center;flex-wrap:wrap}
-.rtn .chips .rate{margin-left:auto}
-.rtn.full .top .ttl{color:var(--good)}
-.chip{appearance:none;border:1px solid var(--line);background:var(--bg);color:var(--ink-3);
-  font-family:inherit;font-size:12px;font-weight:650;min-width:34px;height:32px;
-  border-radius:8px;cursor:pointer;transition:.13s;-webkit-tap-highlight-color:transparent}
-.chip:hover{border-color:var(--ink-3);color:var(--ink)}
-.chip[aria-pressed="true"]{background:var(--good);border-color:var(--good);color:var(--surface)}
-.chip.now{box-shadow:0 0 0 2px var(--accent-soft);border-color:var(--accent)}
-.chip.future{opacity:.5}
-.chip:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 
 /* ── add form ─────────────────────────────────────────────────── */
 .add{margin-top:12px;padding-top:14px;border-top:1px solid var(--line-soft);
@@ -808,31 +791,19 @@ function viewAll(){
   }
   h += '</div>';
 
-  h += '<div class="card"><h2>루틴 · 이번 주 이행</h2>';
+  h += '<div class="card"><h2>루틴</h2>';
   if (!rout.length){
     h += '<div class="empty">반복할 일이 아직 없어.</div>';
   } else {
     h += '<div class="list">';
-    var tdISO = iso(today());
+    /* 전체 is the ledger — routines are stored here, not checked here */
     rout.forEach(function(t){
       if (t.id === editingId){ h += editRow(t); return; }
-      var days = t.days.slice().sort(), plan = days.length, did = 0;
-      days.forEach(function(dw){ if (doneOn(iso(addDays(ws,dw)), t.id)) did++; });
-
-      /* one tappable chip per scheduled weekday of the current week */
-      h += '<div class="rtn'+(did>=plan?' full':'')+'">'
-         + '<div class="top"><div class="ttl">'+ esc(t.title) +'</div>'
-         +   '<div class="tier t'+t.tier+'">'+ TNAME[t.tier] +' '+ PTS[t.tier] +'</div>'
-         +   editBtn(t.id) + delBtn(t.id) + '</div>'
-         + '<div class="chips">'
-         + days.map(function(dw){
-             var dd = iso(addDays(ws,dw)), on = doneOn(dd, t.id);
-             var cls = "chip" + (dd > tdISO ? " future" : "") + (dd === tdISO ? " now" : "");
-             return '<button class="'+cls+'" aria-pressed="'+on+'" data-act="toggle" '
-                  + 'data-id="'+t.id+'" data-d="'+dd+'" aria-label="'+DOW[dw]+'요일">'+ DOW[dw] +'</button>';
-           }).join("")
-         + '<div class="rate">'+ did +'/'+ plan +'</div>'
-         + '</div></div>';
+      h += '<div class="row" style="cursor:default">'
+         + '<div class="ttl">'+ esc(t.title) +'</div>'
+         + '<div class="dayspec">'+ t.days.slice().sort().map(function(x){return DOW[x];}).join("") +'</div>'
+         + '<div class="tier t'+t.tier+'">'+ TNAME[t.tier] +' '+ PTS[t.tier] +'</div>'
+         + editBtn(t.id) + delBtn(t.id) +'</div>';
     });
     h += '</div>';
   }
