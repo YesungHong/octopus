@@ -105,6 +105,26 @@ body{
 }
 .card > h2.mt{margin-top:22px}
 
+/* ── date navigator ───────────────────────────────────────────── */
+.datenav{display:flex;align-items:center;gap:6px;margin:-2px 0 12px}
+.datenav button{appearance:none;border:1px solid var(--line);background:var(--bg);
+  color:var(--ink-2);font:inherit;font-size:19px;line-height:1;width:38px;height:36px;
+  border-radius:9px;cursor:pointer;display:flex;align-items:center;justify-content:center}
+.datenav button:hover:not(:disabled){background:var(--surface-2);color:var(--ink)}
+.datenav button:disabled{opacity:.28;cursor:default}
+.datenav button:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.datenav .dlabel{flex:1;text-align:center;font-family:var(--font-num);font-size:15px;
+  font-weight:600;font-variant-numeric:tabular-nums;display:flex;align-items:center;
+  justify-content:center;gap:6px}
+.datenav .dlabel span{color:var(--ink-3);font-weight:400}
+.datenav .dlabel b{font-family:var(--font-ui);font-size:10px;font-weight:700;letter-spacing:.1em;
+  color:var(--accent-ink);background:var(--accent-soft);padding:3px 7px;border-radius:5px}
+.jump{appearance:none;width:100%;border:1px dashed var(--line);background:transparent;
+  color:var(--ink-3);font:inherit;font-size:12.5px;padding:8px;border-radius:8px;
+  cursor:pointer;margin-bottom:12px}
+.jump:hover{color:var(--ink);border-color:var(--ink-3)}
+.jump:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+
 /* ── the readout (big number) ─────────────────────────────────── */
 .readout{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;margin-bottom:14px}
 .readout .big{font-family:var(--font-num);font-size:44px;line-height:.92;font-weight:600;
@@ -198,8 +218,10 @@ body{
 .tier.t2{color:var(--t2);background:color-mix(in srgb,var(--t2) 15%,transparent)}
 .tier.t3{color:var(--t3);background:color-mix(in srgb,var(--t3) 18%,transparent)}
 .dayspec{font-family:var(--font-num);font-size:10.5px;color:var(--ink-3);flex:none;letter-spacing:.06em}
+/* touch devices have no hover, so the × must stay visible there */
 .del{appearance:none;border:0;background:transparent;color:var(--ink-3);cursor:pointer;
-  font-size:16px;line-height:1;padding:3px 5px;border-radius:5px;flex:none;opacity:0}
+  font-size:17px;line-height:1;padding:5px 8px;border-radius:5px;flex:none;opacity:.5}
+@media (hover:hover){ .del{opacity:0} }
 .row:hover .del,.del:focus-visible{opacity:1}
 .del:hover{color:var(--accent-ink);background:var(--surface-2)}
 .rate{font-family:var(--font-num);font-size:11px;color:var(--ink-3);flex:none;
@@ -420,13 +442,17 @@ function weekPts(ws){
   return sum;
 }
 
-/* tasks that belong on a given date: routines scheduled that weekday,
-   plus every one-off that is still open (or was completed on this date) */
+/* tasks that belong on a given date:
+   - weekly  : routine scheduled on that weekday
+   - day     : added from 일간, lives only on its own date
+   - once    : ledger item, shows every day until it's done */
 function tasksFor(d){
   var ds = iso(d), dow = d.getDay(), out = [];
   S.tasks.forEach(function(t){
     if (t.repeat === "weekly"){
       if (t.days.indexOf(dow) >= 0) out.push(t);
+    } else if (t.repeat === "day"){
+      if (t.date === ds) out.push(t);
     } else {
       if (doneOn(ds,t.id) || !oneOffDone(t.id)) out.push(t);
     }
@@ -444,6 +470,8 @@ function oneOffDate(id){
 
 /* ───────── rendering ───────── */
 var view = "day";
+var dayOffset = 0;                                  /* 0 = today, negative = past */
+function cursorDay(){ return addDays(today(), dayOffset); }
 var el = function(id){ return document.getElementById(id); };
 function esc(s){ return String(s).replace(/[&<>"]/g, function(c){
   return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]; }); }
@@ -455,7 +483,7 @@ function render(){
     b.setAttribute("aria-selected", b.dataset.v === view ? "true" : "false");
   });
   var v = el("view");
-  if (view === "day")  v.innerHTML = viewDay(d);
+  if (view === "day")  v.innerHTML = viewDay(cursorDay());
   if (view === "week") v.innerHTML = viewWeek(ws);
   if (view === "all")  v.innerHTML = viewAll();
   wire();
@@ -485,8 +513,15 @@ function viewDay(d){
   var hit = got >= tgt;
   var left = tgt - got;
 
+  var isToday = ds === iso(today());
   var h = '<div class="card">';
-  h += '<h2>'+ DOW[d.getDay()] +'요일 · '+ md(d) +'</h2>';
+  h += '<div class="datenav">'
+     + '<button data-act="prevday" aria-label="이전 날">‹</button>'
+     + '<div class="dlabel">'+ md(d) +' <span>('+ DOW[d.getDay()] +')</span>'
+     +   (isToday ? '<b>오늘</b>' : '') +'</div>'
+     + '<button data-act="nextday" aria-label="다음 날"'+ (isToday?' disabled':'') +'>›</button>'
+     + '</div>';
+  if (!isToday) h += '<button class="jump" data-act="jumptoday">오늘로 돌아가기</button>';
   h += '<div class="readout"><div class="big">'+ got +'<em>/'+ tgt +' pt</em></div>'
      +  '<div class="side">완료 <b>'+ doneList.length +'</b> / '+ list.length +'개<br>'
      +  (hit ? '초과 <b>+'+ (got-tgt) +'</b> pt' : '남은 <b>'+ left +'</b> pt') +'</div></div>';
@@ -514,10 +549,23 @@ function viewDay(d){
       h += '<div class="row'+(on?' on':'')+'" role="button" tabindex="0" data-act="toggle" data-id="'+t.id+'" data-d="'+ds+'">'
          + chk() + '<div class="ttl">'+ esc(t.title) +'</div>'
          + (t.repeat==="weekly" ? '<div class="dayspec">'+ t.days.map(function(x){return DOW[x];}).join("") +'</div>' : '')
-         + '<div class="tier t'+t.tier+'">'+ TNAME[t.tier] +' '+ PTS[t.tier] +'</div></div>';
+         + '<div class="tier t'+t.tier+'">'+ TNAME[t.tier] +' '+ PTS[t.tier] +'</div>'
+         + (t.repeat !== "weekly"
+             ? '<button class="del" data-act="del" data-id="'+t.id+'" title="삭제">×</button>' : '') +'</div>';
     });
     h += '</div>';
   }
+
+  /* quick-add — lives only on this date */
+  h += '<div class="add">'
+     + '<input type="text" id="nt" placeholder="'+ (isToday ? '오늘 할 일 추가' : md(d)+' 할 일 추가') +'" autocomplete="off">'
+     + '<div class="seg" id="ntier">'
+     +   '<button data-t="1" aria-pressed="false">Easy 1</button>'
+     +   '<button data-t="2" aria-pressed="true">Med 2</button>'
+     +   '<button data-t="3" aria-pressed="false">Hard 3</button></div>'
+     + '<button class="addbtn" data-act="add">추가</button>'
+     + '</div>';
+
   h += '</div>';
   return h;
 }
@@ -686,7 +734,7 @@ function buildReport(ws){
       var t = taskById(id);
       if (!t) continue;
       p += PTS[t.tier]; tiers[t.tier]++;
-      if (t.repeat === "once") oncesDone.push(t.title);
+      if (t.repeat !== "weekly") oncesDone.push(t.title);
     }
     byDay.push(p); total += p;
   }
@@ -827,25 +875,28 @@ function wire(){
           x.setAttribute("aria-pressed", x===b ? "true":"false"); });
       });
     });
-    repSeg.querySelectorAll("button").forEach(function(b){
-      b.setAttribute("aria-pressed", (b.dataset.r === draft.repeat) ? "true":"false");
-      b.addEventListener("click", function(){
-        draft.repeat = b.dataset.r;
-        repSeg.querySelectorAll("button").forEach(function(x){
-          x.setAttribute("aria-pressed", x===b ? "true":"false"); });
-        dayPick.classList.toggle("hide", draft.repeat !== "weekly");
+    /* 일간's quick-add has no repeat/weekday pickers — guard for that */
+    if (repSeg && dayPick){
+      repSeg.querySelectorAll("button").forEach(function(b){
+        b.setAttribute("aria-pressed", (b.dataset.r === draft.repeat) ? "true":"false");
+        b.addEventListener("click", function(){
+          draft.repeat = b.dataset.r;
+          repSeg.querySelectorAll("button").forEach(function(x){
+            x.setAttribute("aria-pressed", x===b ? "true":"false"); });
+          dayPick.classList.toggle("hide", draft.repeat !== "weekly");
+        });
       });
-    });
-    dayPick.classList.toggle("hide", draft.repeat !== "weekly");
-    dayPick.querySelectorAll("button").forEach(function(b){
-      var d = +b.dataset.d;
-      b.setAttribute("aria-pressed", draft.days.indexOf(d)>=0 ? "true":"false");
-      b.addEventListener("click", function(){
-        var k = draft.days.indexOf(d);
-        if (k>=0) draft.days.splice(k,1); else draft.days.push(d);
+      dayPick.classList.toggle("hide", draft.repeat !== "weekly");
+      dayPick.querySelectorAll("button").forEach(function(b){
+        var d = +b.dataset.d;
         b.setAttribute("aria-pressed", draft.days.indexOf(d)>=0 ? "true":"false");
+        b.addEventListener("click", function(){
+          var k = draft.days.indexOf(d);
+          if (k>=0) draft.days.splice(k,1); else draft.days.push(d);
+          b.setAttribute("aria-pressed", draft.days.indexOf(d)>=0 ? "true":"false");
+        });
       });
-    });
+    }
     nt.addEventListener("keydown", function(ev){
       if (ev.key === "Enter"){ ev.preventDefault(); doAct("add"); }
     });
@@ -894,12 +945,15 @@ function doAct(act, n){
   if (act === "add"){
     var nt = el("nt"), title = nt.value.trim();
     if (!title){ nt.focus(); return; }
-    if (draft.repeat === "weekly" && !draft.days.length){ toast("요일을 하나는 골라줘"); return; }
+    /* added from 일간 → belongs to that date only; from 전체 → ledger item */
+    var rep = (view === "day") ? "day" : draft.repeat;
+    if (rep === "weekly" && !draft.days.length){ toast("요일을 하나는 골라줘"); return; }
     S.tasks.push({
       id: "t" + (S.tasks.length ? (Math.max.apply(null, S.tasks.map(function(t){ return +t.id.slice(1)||0; }))+1) : 1),
       title: title, tier: draft.tier,
-      repeat: draft.repeat,
-      days: draft.repeat === "weekly" ? draft.days.slice().sort() : []
+      repeat: rep,
+      date: rep === "day" ? iso(cursorDay()) : undefined,
+      days: rep === "weekly" ? draft.days.slice().sort() : []
     });
     nt.value = ""; draft.days = [];
     save(); render();
@@ -919,6 +973,9 @@ function doAct(act, n){
     } else fallbackCopy(url);
     return;
   }
+  if (act === "prevday"){ dayOffset--; render(); return; }
+  if (act === "nextday"){ if (dayOffset < 0){ dayOffset++; render(); } return; }
+  if (act === "jumptoday"){ dayOffset = 0; render(); return; }
   if (act === "settings"){ render2("settings"); return; }
   if (act === "backweek"){ view = "week"; render(); return; }
   if (act === "reset"){
@@ -952,7 +1009,9 @@ function render2(what){
 
 /* ───────── boot ───────── */
 document.querySelectorAll(".tabs button").forEach(function(b){
-  b.addEventListener("click", function(){ view = b.dataset.v; pendingReport = null; render(); });
+  b.addEventListener("click", function(){
+    view = b.dataset.v; pendingReport = null; dayOffset = 0; render();
+  });
 });
 
 load();
