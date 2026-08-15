@@ -382,6 +382,10 @@ body{
 .stat .k{font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-3);margin-bottom:3px}
 .stat .v{font-family:var(--font-num);font-size:19px;font-weight:600;font-variant-numeric:tabular-nums}
 .stat .v small{font-size:11.5px;color:var(--ink-3);font-weight:400;margin-left:3px}
+.stats.three{grid-template-columns:repeat(3,1fr)}
+.stats.three .stat{padding:11px 8px}
+.stat .v.sm{font-family:var(--font-ui);font-size:15px;font-weight:600}
+.stat .v.hit{color:var(--good)}
 .note{font-size:13px;color:var(--ink-2);line-height:1.65;padding:12px 13px;background:var(--sunk);
   border-radius:9px;margin-top:14px}
 .note.big{font-size:14px;line-height:1.8;padding:16px}
@@ -818,9 +822,33 @@ function viewCompare(d){
   var pct = (Y > 0) ? Math.round((T - Y) / Y * 100) : null;
   var show = !future && !(!hit && !up);        /* case D hides the comparison */
 
+  var c = condOn(ds) || {};
+  var hrs = sleepHours(c);
+  var rate = G ? Math.round(T / G * 100) : 0;
+
   var h = '<div class="card">';
-  h += '<div class="rep-h"><div class="t">어제와 비교</div>'
+  h += '<div class="rep-h"><div class="t">일간 보고서</div>'
      + '<div class="d">'+ md(d) +' ('+ DOW[d.getDay()] +')</div></div>';
+
+  /* today first — finishing the day is the thing that matters */
+  h += '<div class="stats three">'
+     + '<div class="stat"><div class="k">수면</div><div class="v">'
+     +   (hrs === null ? '—' : hrs.toFixed(1) + '<small>시간</small>') +'</div></div>'
+     + '<div class="stat"><div class="k">컨디션</div><div class="v sm">'
+     +   (c.score ? CLABEL[c.score] : '—') +'</div></div>'
+     + '<div class="stat"><div class="k">달성</div><div class="v'+(hit?' hit':'')+'">'
+     +   rate +'<small>%</small></div></div>'
+     + '</div>';
+
+  h += '<div class="rail"><i style="width:'+ Math.min(100, rate) +'%"></i></div>';
+  h += '<div class="goalline">'+ T +' / '+ G +' pt</div>';
+
+  if (hit && !future){
+    h += '<div class="done-banner"><b>오늘 할 일 다 했다.</b>'
+       + '<span>'+ (T > G ? '+'+(T-G)+'pt는 주간으로.' : '') +'</span></div>';
+  }
+
+  h += '<h2 class="mt">어제와 비교</h2>';
 
   if (show){
     h += '<div class="vs">'
@@ -841,12 +869,6 @@ function viewCompare(d){
        + '<div class="vscol now"><div class="lab">오늘</div><div class="num">'+ T +'</div>'
        +   '<div class="unit">pt</div></div>'
        + '</div>';
-  }
-
-  if (!future){
-    h += '<div class="goalline">'+ (hit
-        ? '목표 '+ G +'pt — 채웠어'
-        : '목표 '+ G +'pt') +'</div>';
   }
 
   h += '<div class="note big">🐙 '+ esc(compareMsg(T, Y, G, pct, future)) +'</div>';
@@ -955,7 +977,7 @@ function viewDay(d){
      + '</div>';
 
   h += '</div>';
-  h += '<button class="jump" data-act="compare">어제와 비교해보기</button>';
+  h += '<button class="jump" data-act="compare">오늘 하루 보고서</button>';
   return h;
 }
 function chk(){ return '<div class="box"><svg viewBox="0 0 12 12"><polyline points="1.5,6.5 4.5,9.5 10.5,2.5"/></svg></div>'; }
