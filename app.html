@@ -416,6 +416,13 @@ body{
   color:var(--ink-3);line-height:1.65;text-align:center}
 .need b{font-family:var(--font-num);font-size:15px;color:var(--ink-2)}
 
+.caution{display:flex;flex-direction:column;gap:3px;margin-bottom:13px;padding:10px 12px;
+  border-radius:8px;background:var(--accent-soft);
+  border:1px solid color-mix(in srgb,var(--accent) 30%,transparent);
+  font-size:12px;line-height:1.55;color:var(--accent-ink)}
+.caution s{text-decoration:none;font-family:var(--font-num);font-size:10.5px;
+  color:var(--ink-3);font-variant-numeric:tabular-nums}
+
 .btable{display:flex;flex-direction:column;gap:1px}
 .brow{display:flex;flex-direction:column;gap:7px;padding:11px 2px;
   border-bottom:1px solid var(--line-soft)}
@@ -874,6 +881,12 @@ function bar(frac, cls){
 function needLine(have, need, what){
   return '<div class="need"><b>'+ have +'일</b> / 최소 '+ need +'일 — '+ what +'</div>';
 }
+/* Show the finding, but never let a thin sample pass as fact. */
+function trust(n, strong, what){
+  if (n >= strong) return "";
+  return '<div class="caution">데이터가 적어 믿을 만한 수준은 아니에요. 참고만 하세요.'
+       + '<s>'+ what +' '+ n +'일 · '+ strong +'일쯤부터 안정적이야</s></div>';
+}
 
 function viewInsights(){
   var days = condDays();
@@ -890,9 +903,10 @@ function viewInsights(){
 
   /* 1 — 수면 구간별 컨디션 & 성취 */
   h += '<div class="card"><h2>수면 시간에 따라</h2>';
-  if (wSleep.length < 5){
-    h += needLine(wSleep.length, 5, "수면을 적은 날이 이만큼 모이면 구간별로 보여줄게");
+  if (!wSleep.length){
+    h += needLine(0, 1, "수면을 하루라도 기록하면 여기부터 채워져");
   } else {
+    h += trust(wSleep.length, 10, "수면 기록");
     var rows = BANDS.map(function(b,i){
       var inB = wSleep.filter(function(d){ return bandOf(d.hrs) === i; });
       var sc  = mean(inB.map(function(d){ return d.score; }).filter(Boolean));
@@ -913,24 +927,26 @@ function viewInsights(){
     h += '</div>';
 
     /* 2 — best band, only when a band is actually populated */
-    var solid = rows.filter(function(r){ return r.n >= 4 && r.sc !== null; });
-    if (solid.length >= 2 && wSleepCond.length >= 10){
+    var solid = rows.filter(function(r){ return r.n >= 2 && r.sc !== null; });
+    if (solid.length >= 2){
       var best = solid.slice().sort(function(a,b){ return b.sc - a.sc; })[0];
       h += '<div class="finding"><div class="fk">네 기록상 가장 좋았던 구간</div>'
          + '<div class="fv">'+ best.b.label +'</div>'
          + '<div class="fs">컨디션 평균 '+ best.sc.toFixed(1) +' / 5 · 성취 평균 '
          + best.pt.toFixed(1) +'pt · '+ best.n +'일 기준</div></div>';
     } else {
-      h += needLine(wSleepCond.length, 10, "수면+컨디션이 같이 있는 날이 10일 넘고, 두 구간에 각각 4일 이상 모여야 '가장 좋았던 구간'을 말할 수 있어");
+      h += '<div class="need">아직 수면 시간이 한 구간에만 몰려 있어. '
+         + '서로 다른 길이로 자 본 날이 생기면 비교할 수 있어.</div>';
     }
   }
   h += '</div>';
 
   /* 3 — 컨디션별 성취 */
   h += '<div class="card"><h2>컨디션에 따라</h2>';
-  if (wCond.length < 5){
-    h += needLine(wCond.length, 5, "컨디션을 적은 날이 이만큼 모이면 보여줄게");
+  if (!wCond.length){
+    h += needLine(0, 1, "컨디션을 하루라도 기록하면 여기부터 채워져");
   } else {
+    h += trust(wCond.length, 10, "컨디션 기록");
     h += '<div class="btable">';
     [5,4,3,2,1].forEach(function(k){
       var inK = wCond.filter(function(d){ return d.score === k; });
@@ -946,9 +962,10 @@ function viewInsights(){
 
   /* 4 — 무리한 다음에 오는 것 */
   h += '<div class="card"><h2>무리한 다음날</h2>';
-  if (wCond.length < 8){
-    h += needLine(wCond.length, 8, "컨디션 기록이 이만큼 쌓이면 누적 피로를 볼 수 있어");
+  if (wCond.length < 4){
+    h += needLine(wCond.length, 4, "직전 며칠과 견주려면 최소 4일은 있어야 계산이 돼");
   } else {
+    h += trust(wCond.length, 12, "컨디션 기록");
     var out = [];
 
     /* 직전 3일 부하 */
@@ -960,7 +977,7 @@ function viewInsights(){
     var medLoad = median(loaded.map(function(x){ return x.load; }));
     var hiL = loaded.filter(function(x){ return x.load >  medLoad; });
     var loL = loaded.filter(function(x){ return x.load <= medLoad; });
-    if (hiL.length >= 3 && loL.length >= 3){
+    if (hiL.length >= 2 && loL.length >= 2){
       out.push({
         k: "직전 3일을 많이 달린 뒤",
         a: mean(hiL.map(function(x){ return x.score; })),
@@ -980,7 +997,7 @@ function viewInsights(){
       }
       return { score:d.score, avg: arr.length ? mean(arr) : null };
     }).filter(function(x){ return x.avg !== null; });
-    if (slept.length >= 6){
+    if (slept.length >= 4){
       var medS = median(slept.map(function(x){ return x.avg; }));
       var hiS = slept.filter(function(x){ return x.avg >= medS; });
       var loS = slept.filter(function(x){ return x.avg <  medS; });
@@ -1005,7 +1022,7 @@ function viewInsights(){
     });
     var hiR = streaked.filter(function(x){ return x.run >= 3; });
     var loR = streaked.filter(function(x){ return x.run <  3; });
-    if (hiR.length >= 3 && loR.length >= 3){
+    if (hiR.length >= 2 && loR.length >= 2){
       out.push({
         k: "쉬는 날 없이 이어간 뒤",
         a: mean(hiR.map(function(x){ return x.score; })),
@@ -1016,7 +1033,7 @@ function viewInsights(){
     }
 
     if (!out.length){
-      h += needLine(wCond.length, 8, "기록은 충분한데 아직 뚜렷한 갈림이 안 보여. 조금 더 쌓이면 나올 거야");
+      h += '<div class="need">아직 갈림이 안 보여. 며칠 더 쌓이면 나올 거야.</div>';
     } else {
       out.forEach(function(o){
         var drop = o.b - o.a;
