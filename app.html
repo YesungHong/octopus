@@ -357,6 +357,9 @@ body{
 .cmp{display:flex;flex-direction:column;gap:1px;margin:12px 0 4px}
 .cmpline{display:flex;align-items:center;justify-content:space-between;gap:12px;
   padding:11px 12px;background:var(--sunk);border-radius:8px;font-size:13px;color:var(--ink-2)}
+.cmpline > span{display:flex;flex-direction:column;gap:2px;min-width:0}
+.cmpline > span i{font-style:normal;font-family:var(--font-num);font-size:10.5px;
+  color:var(--ink-3);font-variant-numeric:tabular-nums}
 .cmpline b{font-family:var(--font-num);font-size:16px;color:var(--ink);font-variant-numeric:tabular-nums}
 .cmpline:first-child b{color:var(--good)}
 
@@ -970,7 +973,8 @@ function viewInsights(){
   /* 4 — 무리한 다음에 오는 것 */
   h += '<div class="card"><h2>누적 피로</h2>';
   h += '<div class="secintro">지나간 며칠이 <b>그날의 컨디션</b>에 어떻게 남는지 봐. '
-     + '아래 숫자는 전부 그날 매긴 컨디션 점수의 평균이야 (5점 만점).</div>';
+     + '숫자는 전부 컨디션 평균이고 (5점 만점), 두 무리를 가르는 기준선은 '
+     + '<b>네 기록의 가운데 값</b>이야 — 남들 기준이 아니라 네 평소에서 위냐 아래냐.</div>';
   if (wCond.length < 4){
     h += needLine(wCond.length, 4, "직전 며칠과 견주려면 최소 4일은 있어야 계산이 돼");
   } else {
@@ -988,12 +992,13 @@ function viewInsights(){
     var loL = loaded.filter(function(x){ return x.load <= medLoad; });
     if (hiL.length >= 2 && loL.length >= 2){
       out.push({
-        q: "며칠 몰아서 하면, 다음날 지칠까?",
-        d: "그날 직전 3일 동안 딴 점수를 다 더해서, 많이 달린 뒤와 적게 달린 뒤의 컨디션을 비교했어.",
+        q: "며칠 몰아서 하면, 그 다음에 지칠까?",
+        d: "컨디션을 적은 날마다 <b>그 앞 3일에 얼마나 했는지</b>를 세어서, "
+         + "몰아서 한 뒤에 온 날들과 여유롭게 보낸 뒤에 온 날들의 컨디션을 비교했어.",
         a: mean(hiL.map(function(x){ return x.score; })),
         b: mean(loL.map(function(x){ return x.score; })),
-        la: "직전 3일 합 "+ medLoad.toFixed(0) +"pt 초과",
-        lb: "직전 3일 합 "+ medLoad.toFixed(0) +"pt 이하"
+        la: "몰아서 한 뒤<i>앞 3일 "+ medLoad.toFixed(0) +"pt 넘김</i>",
+        lb: "여유로웠던 뒤<i>앞 3일 "+ medLoad.toFixed(0) +"pt 이하</i>"
       });
     }
 
@@ -1013,12 +1018,13 @@ function viewInsights(){
       var loS = slept.filter(function(x){ return x.avg <  medS; });
       if (hiS.length >= 2 && loS.length >= 2){
         out.push({
-          q: "잠이 며칠 부족하면, 컨디션이 무너질까?",
-          d: "그날 직전 3일의 평균 수면으로 갈라서, 잘 잔 뒤와 못 잔 뒤의 컨디션을 비교했어.",
+          q: "잠이 며칠 모자라면, 컨디션이 무너질까?",
+          d: "컨디션을 적은 날마다 <b>그 앞 3일을 평균 몇 시간 잤는지</b>를 보고, "
+           + "잘 자고 온 날들과 덜 자고 온 날들의 컨디션을 비교했어.",
           a: mean(hiS.map(function(x){ return x.score; })),
           b: mean(loS.map(function(x){ return x.score; })),
-          la: "직전 3일 평균 "+ medS.toFixed(1) +"시간 이상",
-          lb: "직전 3일 평균 "+ medS.toFixed(1) +"시간 미만"
+          la: "잘 자고 온 날<i>앞 3일 평균 "+ medS.toFixed(1) +"시간 이상</i>",
+          lb: "덜 자고 온 날<i>앞 3일 평균 "+ medS.toFixed(1) +"시간 미만</i>"
         });
       }
     }
@@ -1036,11 +1042,12 @@ function viewInsights(){
     if (hiR.length >= 2 && loR.length >= 2){
       out.push({
         q: "쉬는 날 없이 이어가면, 어떻게 될까?",
-        d: "하루도 안 쉬고 3일 이상 이어간 다음날과, 중간에 쉰 날이 있었던 다음날의 컨디션이야.",
+        d: "컨디션을 적은 날마다 <b>그 앞에 며칠을 안 쉬고 달려왔는지</b>를 세서, "
+         + "3일 넘게 이어온 날들과 중간에 쉬어간 날들의 컨디션을 비교했어.",
         a: mean(hiR.map(function(x){ return x.score; })),
         b: mean(loR.map(function(x){ return x.score; })),
-        la: "3일 이상 연달아 한 뒤",
-        lb: "중간에 쉰 날이 있은 뒤"
+        la: "안 쉬고 온 날<i>앞에 3일 이상 연속</i>",
+        lb: "쉬어가며 온 날<i>중간에 쉰 날 있음</i>"
       });
     }
 
