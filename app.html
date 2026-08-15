@@ -910,6 +910,7 @@ function viewCond(d){
      + drow("퀘스트", pts + ' / ' + tgt + ' pt', pts >= tgt ? "good" : "")
      + drow("수면", sleepText(src, hrs), "", "dSleepVal")
      + drow("컨디션", src.score ? CLABEL[src.score] : "—", "")
+     + drow("공부 시간", minsOn(ds) ? hm(minsOn(ds)) : "—", "")
      + '</div>';
   h += '<div class="note" id="dnote">🐙 '+ esc(dayComment(pts, tgt, hrs, src.score, ds)) +'</div>';
   h += '</div>';
@@ -1329,11 +1330,14 @@ function viewCompare(d){
      + '<div class="d">'+ md(d) +' ('+ DOW[d.getDay()] +')</div></div>';
 
   /* today first — finishing the day is the thing that matters */
-  h += '<div class="stats three">'
+  var dayMins = minsOn(ds);
+  h += '<div class="stats">'
      + '<div class="stat"><div class="k">수면</div><div class="v">'
      +   (hrs === null ? '—' : hrs.toFixed(1) + '<small>시간</small>') +'</div></div>'
      + '<div class="stat"><div class="k">컨디션</div><div class="v sm">'
      +   (c.score ? CLABEL[c.score] : '—') +'</div></div>'
+     + '<div class="stat"><div class="k">공부 시간</div><div class="v sm">'
+     +   (dayMins ? hm(dayMins) : '—') +'</div></div>'
      + '<div class="stat"><div class="k">달성</div><div class="v'+(hit?' hit':'')+'">'
      +   rate +'<small>%</small></div></div>'
      + '</div>';
