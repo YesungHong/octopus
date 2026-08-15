@@ -504,20 +504,33 @@ function oneOffDate(id){
 /* ───────── rendering ───────── */
 var view = "day";
 var dayOffset = 0;                                  /* 0 = today, negative = past */
+var weekOffset = 0;                                 /* 0 = this week */
 function cursorDay(){ return addDays(today(), dayOffset); }
+function cursorWeek(){ return addDays(weekStart(today()), weekOffset*7); }
+
+/* points already scheduled in a week, done or not — used to preview a future week */
+function plannedPts(ws){
+  var sum = 0;
+  for (var i=0;i<7;i++){
+    tasksFor(addDays(ws,i)).forEach(function(t){
+      if (t.repeat !== "once") sum += PTS[t.tier];
+    });
+  }
+  return sum;
+}
 var el = function(id){ return document.getElementById(id); };
 function esc(s){ return String(s).replace(/[&<>"]/g, function(c){
   return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]; }); }
 
 function render(){
   var d = today(), ws = weekStart(d);
-  el("period").textContent = "W" + weekNo(ws) + " · " + md(ws) + " → " + md(addDays(ws,6));
+  el("period").textContent = "오늘 " + md(d) + " · W" + weekNo(ws);
   document.querySelectorAll(".tabs button").forEach(function(b){
     b.setAttribute("aria-selected", b.dataset.v === view ? "true" : "false");
   });
   var v = el("view");
   if (view === "day")  v.innerHTML = viewDay(cursorDay());
-  if (view === "week") v.innerHTML = viewWeek(ws);
+  if (view === "week") v.innerHTML = viewWeek(cursorWeek());
   if (view === "all")  v.innerHTML = viewAll();
   wire();
 }
@@ -654,10 +667,30 @@ function viewWeek(ws){
     day.push({ds:ds,p:p,i:i});
   }
 
-  var h = '<div class="card"><h2>이번 주</h2>';
-  h += '<div class="readout"><div class="big">'+ pct +'<em>%</em></div>'
-     + '<div class="side"><b>'+ got +'</b> / '+ tgt +' pt<br>목표 달성 <b>'
-     + day.filter(function(x){return x.p>=S.dailyTarget;}).length +'</b> / 7일</div></div>';
+  var isNow   = weekOffset === 0;
+  var isAhead = weekOffset > 0;
+
+  var h = '<div class="card">';
+  h += '<div class="datenav">'
+     + '<button data-act="prevweek" aria-label="이전 주">‹</button>'
+     + '<div class="dlabel">W'+ weekNo(ws) +' <span>'+ md(ws) +'→'+ md(addDays(ws,6)) +'</span>'
+     +   (isNow ? '<b>이번 주</b>' : (isAhead ? '<b class="soon">예정</b>' : '')) +'</div>'
+     + '<button data-act="nextweek" aria-label="다음 주">›</button>'
+     + '</div>';
+  if (!isNow){
+    h += '<button class="jump" data-act="jumpweek">이번 주로 돌아가기'
+       + ' <em>' + (isAhead ? "+"+weekOffset : weekOffset) + '주</em></button>';
+  }
+
+  if (isAhead && got === 0){
+    var plan = plannedPts(ws);
+    h += '<div class="readout"><div class="big">'+ plan +'<em> pt</em></div>'
+       + '<div class="side">예정된 점수<br>목표 '+ tgt +' pt</div></div>';
+  } else {
+    h += '<div class="readout"><div class="big">'+ pct +'<em>%</em></div>'
+       + '<div class="side"><b>'+ got +'</b> / '+ tgt +' pt<br>목표 달성 <b>'
+       + day.filter(function(x){return x.p>=S.dailyTarget;}).length +'</b> / 7일</div></div>';
+  }
 
   h += '<div class="days">';
   day.forEach(function(x){
@@ -671,43 +704,57 @@ function viewWeek(ws){
   h += '<div class="dow">'+ DOW.map(function(n,i){
          return '<span'+(iso(addDays(ws,i))===td?' class="now"':'')+'>'+n+'</span>'; }).join("") +'</div>';
 
-  /* reward rail */
-  h += '<div class="rail"><i style="width:'+pct+'%"></i>'
-     + S.rewards.map(function(r){
-         return '<u class="'+(pct>=r.pct?"on":"")+'" style="left:calc('+r.pct+'% - .75px)"></u>'; }).join("")
-     + '</div>';
+  /* The reward ladder belongs to the week you are actually living in.
+     Showing it against a past week's points would be a lie, so other weeks
+     get their saved report instead. */
+  if (isNow){
+    h += '<div class="rail"><i style="width:'+pct+'%"></i>'
+       + S.rewards.map(function(r){
+           return '<u class="'+(pct>=r.pct?"on":"")+'" style="left:calc('+r.pct+'% - .75px)"></u>'; }).join("")
+       + '</div>';
 
-  h += '<h2 class="mt">보상</h2><div class="ladder">';
-  var nextIdx = -1;
-  S.rewards.forEach(function(r,i){ if (nextIdx<0 && pct < r.pct) nextIdx = i; });
-  S.rewards.forEach(function(r,i){
-    var open = pct >= r.pct;
-    var cls = r.claimed ? "got" : (open ? "" : (i===nextIdx ? "next" : "locked"));
-    var need = Math.max(0, Math.ceil(tgt*r.pct/100) - got);
-    h += '<div class="rw '+cls+'"><div class="pct">'+ r.pct +'%</div>'
-       + '<input type="text" data-act="reward" data-i="'+i+'" value="'+ esc(r.text) +'" placeholder="보상 적기">';
-    if (r.claimed)      h += '<div class="st">받음 ✓</div>';
-    else if (open)      h += '<button data-act="claim" data-i="'+i+'">받기</button>';
-    else if (i===nextIdx) h += '<div class="st">'+ need +'pt 남음</div>';
-    else                h += '<div class="st">'+ need +'pt</div>';
-    h += '</div>';
-  });
-  h += '</div></div>';
-
-  /* archive */
-  if (S.reports.length){
-    h += '<div class="card"><h2>지난 보고서</h2>';
-    S.reports.slice().reverse().forEach(function(r,ri){
-      var realIdx = S.reports.length-1-ri;
-      h += '<div class="arch" role="button" tabindex="0" data-act="openrep" data-i="'+realIdx+'">'
-         + '<div class="w">W'+ r.wno +'</div><div>'+ r.range +'</div>'
-         + '<div class="p">'+ r.total +' pt</div></div>';
+    h += '<h2 class="mt">보상</h2><div class="ladder">';
+    var nextIdx = -1;
+    S.rewards.forEach(function(r,i){ if (nextIdx<0 && pct < r.pct) nextIdx = i; });
+    S.rewards.forEach(function(r,i){
+      var open = pct >= r.pct;
+      var cls = r.claimed ? "got" : (open ? "" : (i===nextIdx ? "next" : "locked"));
+      var need = Math.max(0, Math.ceil(tgt*r.pct/100) - got);
+      h += '<div class="rw '+cls+'"><div class="pct">'+ r.pct +'%</div>'
+         + '<input type="text" data-act="reward" data-i="'+i+'" value="'+ esc(r.text) +'" placeholder="보상 적기">';
+      if (r.claimed)      h += '<div class="st">받음 ✓</div>';
+      else if (open)      h += '<button data-act="claim" data-i="'+i+'">받기</button>';
+      else if (i===nextIdx) h += '<div class="st">'+ need +'pt 남음</div>';
+      else                h += '<div class="st">'+ need +'pt</div>';
+      h += '</div>';
     });
     h += '</div>';
   }
+  h += '</div>';
 
-  h += '<div class="foot"><button data-act="copy">링크 복사</button>'
-     + '<button data-act="settings">설정</button></div>';
+  if (!isNow){
+    var saved = -1;
+    S.reports.forEach(function(x,i){ if (x.key === weekKey(ws)) saved = i; });
+    if (saved >= 0){
+      h += '<div class="foot"><button data-act="openrep" data-i="'+saved+'">이 주 보고서 보기</button></div>';
+    }
+  }
+
+  /* archive + tools live on the current week only */
+  if (isNow){
+    if (S.reports.length){
+      h += '<div class="card"><h2>지난 보고서</h2>';
+      S.reports.slice().reverse().forEach(function(r,ri){
+        var realIdx = S.reports.length-1-ri;
+        h += '<div class="arch" role="button" tabindex="0" data-act="openrep" data-i="'+realIdx+'">'
+           + '<div class="w">W'+ r.wno +'</div><div>'+ r.range +'</div>'
+           + '<div class="p">'+ r.total +' pt</div></div>';
+      });
+      h += '</div>';
+    }
+    h += '<div class="foot"><button data-act="copy">링크 복사</button>'
+       + '<button data-act="settings">설정</button></div>';
+  }
   return h;
 }
 
@@ -1101,6 +1148,9 @@ function doAct(act, n){
   if (act === "prevday"){ if (dayOffset > -3650){ dayOffset--; render(); } return; }
   if (act === "nextday"){ if (dayOffset <  365){ dayOffset++; render(); } return; }
   if (act === "jumptoday"){ dayOffset = 0; render(); return; }
+  if (act === "prevweek"){ if (weekOffset > -520){ weekOffset--; render(); } return; }
+  if (act === "nextweek"){ if (weekOffset <   52){ weekOffset++; render(); } return; }
+  if (act === "jumpweek"){ weekOffset = 0; render(); return; }
   if (act === "settings"){ render2("settings"); return; }
   if (act === "backweek"){ view = "week"; render(); return; }
   if (act === "reset"){
@@ -1135,7 +1185,8 @@ function render2(what){
 /* ───────── boot ───────── */
 document.querySelectorAll(".tabs button").forEach(function(b){
   b.addEventListener("click", function(){
-    view = b.dataset.v; pendingReport = null; dayOffset = 0; editingId = null; render();
+    view = b.dataset.v; pendingReport = null;
+    dayOffset = 0; weekOffset = 0; editingId = null; render();
   });
 });
 
