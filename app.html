@@ -447,11 +447,19 @@ body{
   color:var(--ink);font-variant-numeric:tabular-nums}
 .finding .fs{font-size:11.5px;color:var(--ink-2);font-variant-numeric:tabular-nums}
 
-.cmp2{margin-bottom:16px}
-.cmp2:last-child{margin-bottom:0}
-.cmp2 .ck{font-size:13px;font-weight:600;margin-bottom:8px}
+.secintro{font-size:12.5px;color:var(--ink-2);line-height:1.65;margin:-4px 0 16px}
+.secintro b{color:var(--ink);font-weight:600}
+
+.cmp2{margin-bottom:22px;padding-bottom:22px;border-bottom:1px solid var(--line-soft)}
+.cmp2:last-child{margin-bottom:0;padding-bottom:0;border-bottom:0}
+.cmp2 .ck{font-size:14px;font-weight:650;line-height:1.45;margin-bottom:5px}
+.cmp2 .cd{font-size:12px;color:var(--ink-3);line-height:1.6;margin-bottom:11px}
 .cmp2 .cmpline{margin-bottom:1px}
-.cnote{margin-top:8px;font-size:12.5px;color:var(--ink-2);line-height:1.6}
+.cmpline b s{text-decoration:none;font-size:10.5px;color:var(--ink-3);margin-left:2px}
+.cnote{margin-top:10px;font-size:12.5px;color:var(--ink-2);line-height:1.6;
+  padding:10px 12px;border-radius:8px;background:var(--sunk)}
+.cnote.warn{background:var(--accent-soft);color:var(--accent-ink)}
+.cnote.ok{background:var(--good-soft);color:var(--good)}
 .arch{display:flex;align-items:center;gap:10px;padding:9px 8px;border-radius:7px;cursor:pointer;font-size:13px}
 .arch:hover{background:var(--surface-2)}
 .arch .w{font-family:var(--font-num);font-size:11.5px;color:var(--ink-3);flex:none;width:44px}
@@ -858,11 +866,10 @@ function dayComment(pts, tgt, hrs, score, ds){
    derived from four nights is a lie with a decimal point on it, so when the
    data isn't there we say what's missing instead of inventing a finding. */
 var BANDS = [
-  {lo:0,   hi:5.5, label:"5.5시간 미만"},
-  {lo:5.5, hi:6.5, label:"5.5 – 6.5시간"},
-  {lo:6.5, hi:7.5, label:"6.5 – 7.5시간"},
-  {lo:7.5, hi:8.5, label:"7.5 – 8.5시간"},
-  {lo:8.5, hi:99,  label:"8.5시간 이상"}
+  {lo:0, hi:6,  label:"6시간 미만"},
+  {lo:6, hi:7,  label:"6 – 7시간"},
+  {lo:7, hi:8,  label:"7 – 8시간"},
+  {lo:8, hi:99, label:"8시간 이상"}
 ];
 function bandOf(h){
   for (var i=0;i<BANDS.length;i++) if (h >= BANDS[i].lo && h < BANDS[i].hi) return i;
@@ -961,7 +968,9 @@ function viewInsights(){
   h += '</div>';
 
   /* 4 — 무리한 다음에 오는 것 */
-  h += '<div class="card"><h2>무리한 다음날</h2>';
+  h += '<div class="card"><h2>누적 피로</h2>';
+  h += '<div class="secintro">지나간 며칠이 <b>그날의 컨디션</b>에 어떻게 남는지 봐. '
+     + '아래 숫자는 전부 그날 매긴 컨디션 점수의 평균이야 (5점 만점).</div>';
   if (wCond.length < 4){
     h += needLine(wCond.length, 4, "직전 며칠과 견주려면 최소 4일은 있어야 계산이 돼");
   } else {
@@ -979,11 +988,12 @@ function viewInsights(){
     var loL = loaded.filter(function(x){ return x.load <= medLoad; });
     if (hiL.length >= 2 && loL.length >= 2){
       out.push({
-        k: "직전 3일을 많이 달린 뒤",
+        q: "며칠 몰아서 하면, 다음날 지칠까?",
+        d: "그날 직전 3일 동안 딴 점수를 다 더해서, 많이 달린 뒤와 적게 달린 뒤의 컨디션을 비교했어.",
         a: mean(hiL.map(function(x){ return x.score; })),
         b: mean(loL.map(function(x){ return x.score; })),
-        la: "많이 달린 뒤 ("+ medLoad.toFixed(0) +"pt 초과)",
-        lb: "적게 달린 뒤"
+        la: "직전 3일 합 "+ medLoad.toFixed(0) +"pt 초과",
+        lb: "직전 3일 합 "+ medLoad.toFixed(0) +"pt 이하"
       });
     }
 
@@ -1003,11 +1013,12 @@ function viewInsights(){
       var loS = slept.filter(function(x){ return x.avg <  medS; });
       if (hiS.length >= 2 && loS.length >= 2){
         out.push({
-          k: "직전 3일 수면",
+          q: "잠이 며칠 부족하면, 컨디션이 무너질까?",
+          d: "그날 직전 3일의 평균 수면으로 갈라서, 잘 잔 뒤와 못 잔 뒤의 컨디션을 비교했어.",
           a: mean(hiS.map(function(x){ return x.score; })),
           b: mean(loS.map(function(x){ return x.score; })),
-          la: medS.toFixed(1) +"시간 이상 잔 뒤",
-          lb: medS.toFixed(1) +"시간 미만 잔 뒤"
+          la: "직전 3일 평균 "+ medS.toFixed(1) +"시간 이상",
+          lb: "직전 3일 평균 "+ medS.toFixed(1) +"시간 미만"
         });
       }
     }
@@ -1024,11 +1035,12 @@ function viewInsights(){
     var loR = streaked.filter(function(x){ return x.run <  3; });
     if (hiR.length >= 2 && loR.length >= 2){
       out.push({
-        k: "쉬는 날 없이 이어간 뒤",
+        q: "쉬는 날 없이 이어가면, 어떻게 될까?",
+        d: "하루도 안 쉬고 3일 이상 이어간 다음날과, 중간에 쉰 날이 있었던 다음날의 컨디션이야.",
         a: mean(hiR.map(function(x){ return x.score; })),
         b: mean(loR.map(function(x){ return x.score; })),
-        la: "3일 이상 연속 뒤",
-        lb: "중간에 쉰 뒤"
+        la: "3일 이상 연달아 한 뒤",
+        lb: "중간에 쉰 날이 있은 뒤"
       });
     }
 
@@ -1037,15 +1049,16 @@ function viewInsights(){
     } else {
       out.forEach(function(o){
         var drop = o.b - o.a;
-        h += '<div class="cmp2"><div class="ck">'+ o.k +'</div>'
-           + '<div class="cmpline"><span>'+ o.la +'</span><b>'+ o.a.toFixed(1) +'</b></div>'
-           + '<div class="cmpline"><span>'+ o.lb +'</span><b>'+ o.b.toFixed(1) +'</b></div>'
-           + '<div class="cnote">'
+        h += '<div class="cmp2"><div class="ck">'+ o.q +'</div>'
+           + '<div class="cd">'+ o.d +'</div>'
+           + '<div class="cmpline"><span>'+ o.la +'</span><b>'+ o.a.toFixed(1) +'<s>/5</s></b></div>'
+           + '<div class="cmpline"><span>'+ o.lb +'</span><b>'+ o.b.toFixed(1) +'<s>/5</s></b></div>'
+           + '<div class="cnote'+ (Math.abs(drop) < 0.3 ? '' : (drop > 0 ? ' warn' : ' ok')) +'">'
            +   (Math.abs(drop) < 0.3
-                 ? '차이가 거의 없어 — 이건 네 컨디션을 흔드는 요인이 아닌 것 같아.'
+                 ? '→ 차이가 거의 없어. 이건 네 컨디션을 흔드는 요인이 아닌 것 같아.'
                  : (drop > 0
-                     ? '컨디션이 '+ drop.toFixed(1) +'점 낮아져. 여기가 네 피로가 쌓이는 지점이야.'
-                     : '오히려 '+ Math.abs(drop).toFixed(1) +'점 높아. 이건 너한테 잘 맞는 리듬인 듯.'))
+                     ? '→ 컨디션이 '+ drop.toFixed(1) +'점 낮아져. 여기가 네 피로가 쌓이는 지점이야.'
+                     : '→ 오히려 '+ Math.abs(drop).toFixed(1) +'점 높아. 이건 너한테 잘 맞는 리듬인 것 같아.'))
            + '</div></div>';
       });
     }
