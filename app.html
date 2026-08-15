@@ -271,6 +271,44 @@ button,.row,.chip,.tabs button,.condpick button,.seg button,.dowpick button{
 
 .empty{padding:22px 8px;text-align:center;color:var(--ink-3);font-size:13px;line-height:1.7}
 
+/* ── study time ───────────────────────────────────────────────── */
+.tchip{appearance:none;border:1px dashed var(--line);background:transparent;color:var(--ink-3);
+  font-family:var(--font-num);font-size:11px;font-weight:600;padding:4px 8px;border-radius:6px;
+  cursor:pointer;flex:none;white-space:nowrap;touch-action:manipulation}
+.tchip:hover{border-color:var(--accent);color:var(--accent-ink)}
+.tchip.set{border-style:solid;border-color:var(--t2);color:var(--t2);
+  background:color-mix(in srgb,var(--t2) 10%,transparent)}
+.tchip:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+.tpick{margin:2px 0 6px;padding:12px;border-radius:10px;background:var(--surface-2);
+  border:1px solid var(--line)}
+.tpl{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-3);margin-bottom:9px}
+.tprow{display:flex;flex-wrap:wrap;gap:5px}
+.tprow.custom{margin-top:8px}
+.tprow button{appearance:none;border:1px solid var(--line);background:var(--bg);color:var(--ink-2);
+  font-family:var(--font-num);font-size:12.5px;font-weight:600;padding:9px 11px;border-radius:8px;
+  cursor:pointer;touch-action:manipulation}
+.tprow button:hover{border-color:var(--accent);color:var(--ink)}
+.tprow button[aria-pressed="true"]{background:var(--t2);border-color:var(--t2);color:var(--surface)}
+.tprow button.clr{color:var(--ink-3);border-style:dashed}
+.tprow button:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.tprow input{flex:1;min-width:90px;background:var(--bg);border:1px solid var(--line);
+  border-radius:8px;padding:9px 11px;color:var(--ink);font-family:var(--font-num);font-size:13px}
+.tprow input:focus{outline:0;border-color:var(--accent)}
+
+.studyrow{display:flex;align-items:baseline;justify-content:space-between;gap:12px;
+  margin-top:13px;padding:12px 13px;border-radius:9px;background:var(--sunk)}
+.studyrow span{font-size:11px;letter-spacing:.11em;text-transform:uppercase;color:var(--ink-3)}
+.studyrow b{font-family:var(--font-num);font-size:19px;font-weight:600;
+  font-variant-numeric:tabular-nums;color:var(--ink)}
+.studyrow b.zero{font-size:13px;font-weight:400;color:var(--ink-3)}
+.studyhint{margin-top:7px;font-size:11.5px;color:var(--ink-3);text-align:right}
+
+.days.mins .stack{background:var(--t2)}
+.card > h2 em{float:right;font-style:normal;font-family:var(--font-num);font-size:12px;
+  letter-spacing:0;text-transform:none;color:var(--ink-2)}
+.bl em{font-style:normal;font-family:var(--font-num);font-size:11px;color:var(--ink-3);font-weight:400}
+
 
 /* ── add form ─────────────────────────────────────────────────── */
 .add{margin-top:12px;padding-top:14px;border-top:1px solid var(--line-soft);
@@ -555,6 +593,8 @@ function blank(){
     log: {},                                     /* "YYYY-MM-DD": { taskId: true } */
     cond: {},                                    /* "YYYY-MM-DD": {sleep:"23:30", wake:"07:10", score:1..5}
                                                     filed under the date you WOKE UP */
+    time: {},                                    /* "YYYY-MM-DD": { taskId: minutes }
+                                                    measured only — never scored */
     rewards: [ {pct:25,text:"",claimed:false},
                {pct:50,text:"",claimed:false},
                {pct:75,text:"",claimed:false},
@@ -663,6 +703,43 @@ function median(arr){
   if (!v.length) return null;
   var m = Math.floor(v.length/2);
   return v.length % 2 ? v[m] : (v[m-1]+v[m])/2;
+}
+
+/* ───────── study time ─────────
+   Deliberately has no target. Points answer "did it get done"; minutes answer
+   "what did it cost me". Scoring the minutes would reward sitting still. */
+function minsOn(ds){
+  var m = S.time[ds] || {}, s = 0;
+  for (var k in m) s += m[k];
+  return s;
+}
+function minsFor(ds, id){ return (S.time[ds] && S.time[ds][id]) || 0; }
+function setMins(ds, id, v){
+  if (!S.time[ds]) S.time[ds] = {};
+  if (!v) delete S.time[ds][id]; else S.time[ds][id] = v;
+  if (!Object.keys(S.time[ds]).length) delete S.time[ds];
+}
+function weekMins(ws){
+  var s = 0;
+  for (var i=0;i<7;i++) s += minsOn(iso(addDays(ws,i)));
+  return s;
+}
+function hm(mins){
+  if (!mins) return "0분";
+  var h = Math.floor(mins/60), m = mins % 60;
+  if (!h) return m + "분";
+  return h + "시간" + (m ? " " + m + "분" : "");
+}
+/* minutes recorded per tier, across all history */
+function tierTimes(){
+  var acc = {1:[], 2:[], 3:[]};
+  for (var ds in S.time){
+    for (var id in S.time[ds]){
+      var t = taskById(id);
+      if (t && acc[t.tier]) acc[t.tier].push(S.time[ds][id]);
+    }
+  }
+  return acc;
 }
 
 /* ───────── scoring ───────── */
@@ -1076,6 +1153,57 @@ function viewInsights(){
   }
   h += '</div>';
 
+  /* 3.5 — 티어가 실제 시간과 맞는지 */
+  var tt = tierTimes();
+  var nT = tt[1].length + tt[2].length + tt[3].length;
+  h += '<div class="card"><h2>티어별 실제 걸린 시간</h2>';
+  h += '<div class="secintro">네가 붙인 <b>Easy / Medium / Hard</b>가 실제 소요 시간과 맞는지 봐. '
+     + '감으로 매긴 난이도를 실측으로 검증하는 거야.</div>';
+  if (!nT){
+    h += '<div class="need">아직 시간 기록이 없어. 일간에서 퀘스트를 체크하면 <b>+시간</b> 칩이 생겨.</div>';
+  } else {
+    h += trust(nT, 15, "시간 기록");
+    var avg = {}, maxAvg = 1;
+    [1,2,3].forEach(function(k){
+      avg[k] = tt[k].length ? mean(tt[k]) : null;
+      if (avg[k] && avg[k] > maxAvg) maxAvg = avg[k];
+    });
+    h += '<div class="btable">';
+    [1,2,3].forEach(function(k){
+      if (!tt[k].length) return;
+      h += '<div class="brow"><div class="bl">'+ TNAME[k] +' <em>'+ PTS[k] +'pt</em><s>'+ tt[k].length +'건</s></div>'
+         + '<div class="bv"><div class="bcell wide"><u>'+ hm(Math.round(avg[k])) +'</u>'
+         + bar(avg[k]/maxAvg, "acc") +'</div></div></div>';
+    });
+    h += '</div>';
+
+    /* does the point ladder match the time ladder? */
+    var have = [1,2,3].filter(function(k){ return tt[k].length >= 2; });
+    if (have.length >= 2){
+      var lo = have[0], hi = have[have.length-1];
+      var tRatio = avg[hi] / avg[lo];
+      var pRatio = PTS[hi] / PTS[lo];
+      var msg, cls = "";
+      if (tRatio > pRatio * 1.6){
+        cls = "warn";
+        msg = TNAME[hi] +'가 '+ TNAME[lo] +'보다 시간은 <b>'+ tRatio.toFixed(1) +'배</b> 걸리는데, '
+            + '점수는 '+ pRatio.toFixed(1) +'배뿐이야. '
+            + TNAME[hi] +'짜리가 점수에 비해 훨씬 비싸게 먹히고 있어 — '
+            + '쪼개서 여러 개로 만들거나, 애초에 티어를 다시 매기는 걸 고민해봐.';
+      } else if (tRatio < pRatio / 1.6){
+        msg = TNAME[hi] +'가 생각보다 안 걸려. 시간은 '+ tRatio.toFixed(1) +'배인데 점수는 '
+            + pRatio.toFixed(1) +'배야. '
+            + '지금 '+ TNAME[hi] +'로 분류한 것들이 사실 그렇게 무겁지 않은 걸 수도 있어.';
+      } else {
+        cls = "ok";
+        msg = '시간 비율('+ tRatio.toFixed(1) +'배)이랑 점수 비율('+ pRatio.toFixed(1) +'배)이 '
+            + '대체로 맞아떨어져. <b>티어를 잘 매기고 있어.</b>';
+      }
+      h += '<div class="cnote'+(cls?' '+cls:'')+'">'+ msg +'</div>';
+    }
+  }
+  h += '</div>';
+
   /* 4 — 무리한 다음에 오는 것 */
   h += '<div class="card"><h2>누적 피로</h2>';
   h += '<div class="secintro">지나간 며칠이 <b>그날의 컨디션</b>에 어떻게 남는지 봐. '
@@ -1308,6 +1436,11 @@ function viewDay(d){
   h += '<div class="track-legend"><span>0</span><span>'+ tgt +' pt</span></div>';
   h += targetNote(ds);
 
+  var todayMins = minsOn(ds);
+  h += '<div class="studyrow"><span>공부 시간</span>'
+     + '<b'+(todayMins?'':' class="zero"')+'>'+ (todayMins ? hm(todayMins) : '아직 없음') +'</b></div>';
+  if (todayMins) h += '<div class="studyhint">시간엔 목표가 없어. 그냥 얼마나 썼는지만 남겨두는 거야.</div>';
+
   if (overflow > 0){
     h += '<div class="bonus"><span>보너스 +'+ overflow +'</span>'
        + '<div class="bar"><i style="width:'+ Math.min(100, overflow/tgt*100) +'%"></i></div>'
@@ -1327,12 +1460,28 @@ function viewDay(d){
     list.forEach(function(t){
       if (t.id === editingId){ h += editRow(t); return; }
       var on = doneOn(ds,t.id);
+      var mins = minsFor(ds, t.id);
       h += '<div class="row'+(on?' on':'')+'" role="button" tabindex="0" data-act="toggle" data-id="'+t.id+'" data-d="'+ds+'">'
          + chk() + '<div class="ttl">'+ esc(t.title) +'</div>'
          + (t.repeat==="weekly" ? '<div class="dayspec">'+ t.days.map(function(x){return DOW[x];}).join("") +'</div>' : '')
          + '<div class="tier t'+t.tier+'">'+ TNAME[t.tier] +' '+ PTS[t.tier] +'</div>'
+         + (on ? '<button class="tchip'+(mins?' set':'')+'" data-act="timeopen" data-id="'+t.id+'" data-d="'+ds+'">'
+               + (mins ? hm(mins) : '+시간') +'</button>' : '')
          + editBtn(t.id)
          + (t.repeat !== "weekly" ? delBtn(t.id) : '') +'</div>';
+
+      if (timingId === t.id){
+        h += '<div class="tpick"><div class="tpl">얼마나 걸렸어?</div><div class="tprow">'
+           + [15,30,45,60,90,120,180].map(function(v){
+               return '<button data-act="tset" data-v="'+v+'" data-d="'+ds+'"'
+                    + (mins===v?' aria-pressed="true"':'') +'>'+ (v<60? v+'분' : hm(v)) +'</button>';
+             }).join("")
+           + '</div><div class="tprow custom">'
+           + '<input type="number" id="tcustom" min="1" max="1440" inputmode="numeric" placeholder="직접 (분)" value="">'
+           + '<button data-act="tsetc" data-d="'+ds+'">확인</button>'
+           + (mins ? '<button class="clr" data-act="tset" data-v="0" data-d="'+ds+'">지우기</button>' : '')
+           + '</div></div>';
+      }
     });
     h += '</div>';
   }
@@ -1434,6 +1583,31 @@ function viewWeek(ws){
   h += '</div>';
   h += '<div class="dow">'+ DOW.map(function(n,i){
          return '<span'+(iso(addDays(ws,i))===td?' class="now"':'')+'>'+n+'</span>'; }).join("") +'</div>';
+
+  /* second chart: minutes. No target line — this one is only ever a record. */
+  var mins = [], maxm = 1;
+  for (var mi=0; mi<7; mi++){
+    var mv = minsOn(iso(addDays(ws,mi)));
+    mins.push(mv); if (mv > maxm) maxm = mv;
+  }
+  var totMins = mins.reduce(function(a,b){ return a+b; }, 0);
+  h += '<h2 class="mt">공부 시간<em>'+ hm(totMins) +'</em></h2>';
+  if (!totMins){
+    h += '<div class="need">이번 주엔 아직 시간 기록이 없어. 일간에서 퀘스트를 체크하면 <b>+시간</b> 칩이 생겨.</div>';
+  } else {
+    h += '<div class="days mins">';
+    mins.forEach(function(v,i){
+      var ds2 = iso(addDays(ws,i));
+      var cls = v > 0 ? "some" : "";
+      if (ds2 === td) cls += " today";
+      var hpx = v ? Math.max(4, Math.round(v/maxm*76)) : 3;
+      h += '<div class="day '+cls+'"><div class="pt">'+ (v ? (v>=60 ? (v/60).toFixed(1)+'h' : v+'m') : '·') +'</div>'
+         + '<div class="stack" style="height:'+hpx+'px"></div></div>';
+    });
+    h += '</div>';
+    h += '<div class="dow">'+ DOW.map(function(n,i){
+           return '<span'+(iso(addDays(ws,i))===td?' class="now"':'')+'>'+n+'</span>'; }).join("") +'</div>';
+  }
 
   /* The reward ladder belongs to the week you are actually living in.
      Showing it against a past week's points would be a lie, so other weeks
@@ -1597,6 +1771,7 @@ function buildReport(ws){
     range: md(ws) + " → " + md(addDays(ws,6)),
     total: total, byDay: byDay, tiers: tiers, sleep: sleep, cond: cond,
     targets: byDay.map(function(_,i){ return targetFor(iso(addDays(ws,i))); }),
+    mins: byDay.map(function(_,i){ return minsOn(iso(addDays(ws,i))); }),
     hits: byDay.filter(function(p,i){ return p >= targetFor(iso(addDays(ws,i))); }).length,
     target: S.weeklyTarget,
     routines: routines, onces: oncesDone,
@@ -1634,6 +1809,18 @@ function viewReport(r, prev, isPreview){
      + '<div class="stat"><div class="k">난이도</div><div class="v" style="font-size:14px">H '+r.tiers[3]+' · M '+r.tiers[2]+' · E '+r.tiers[1]+'</div></div>'
      + '<div class="stat"><div class="k">한 번짜리</div><div class="v">'+ r.onces.length +'<small>개 완료</small></div></div>'
      + '</div>';
+
+  var rm = r.mins || [];
+  var totM = rm.reduce(function(a,b){ return a+b; }, 0);
+  if (totM){
+    var daysWith = rm.filter(function(x){ return x > 0; }).length;
+    h += '<h2 class="mt">공부 시간</h2>';
+    h += '<div class="stats">'
+       + '<div class="stat"><div class="k">주 합계</div><div class="v sm">'+ hm(totM) +'</div></div>'
+       + '<div class="stat"><div class="k">기록된 날 평균</div><div class="v sm">'
+       +   hm(Math.round(totM/daysWith)) +'<small>· '+ daysWith +'일</small></div></div>'
+       + '</div>';
+  }
 
   /* sleep ↔ output. Split at the week's own median so it always says something
      real, instead of an arbitrary "7 hours" that some weeks never cross. */
@@ -1742,6 +1929,7 @@ function checkRollover(){
 var draft = { tier:2, repeat:"once", days:[] };
 var editingId = null, edraft = { tier:2, days:[] };
 var editingCond = false, cdraftDate = null;
+var timingId = null;
 var cdraft = { sleep:"", wake:"", score:0 };
 
 function toast(msg){
@@ -1866,7 +2054,10 @@ function doAct(act, n){
     var id = n.dataset.id, ds = n.dataset.d;
     var ws = weekStart(today());
     var before = Math.round(weekPts(ws)/S.weeklyTarget*100);
-    toggle(ds, id); save();
+    var wasOn = doneOn(ds, id);
+    toggle(ds, id);
+    if (wasOn) setMins(ds, id, 0);   /* unchecking drops its time too */
+    timingId = null; save();
     var after = Math.round(weekPts(ws)/S.weeklyTarget*100);
     var dayNow = ptsOn(iso(today()));
 
@@ -1902,6 +2093,20 @@ function doAct(act, n){
     st.tier  = edraft.tier;
     if (st.repeat === "weekly") st.days = edraft.days.slice().sort();
     editingId = null; save(); render(); return;
+  }
+  if (act === "timeopen"){
+    timingId = (timingId === n.dataset.id) ? null : n.dataset.id;
+    render(); return;
+  }
+  if (act === "tset"){
+    if (timingId){ setMins(n.dataset.d, timingId, +n.dataset.v); save(); }
+    timingId = null; render(); return;
+  }
+  if (act === "tsetc"){
+    var box = el("tcustom"), v = Math.max(0, Math.min(1440, parseInt(box.value,10) || 0));
+    if (!v){ box.focus(); return; }
+    if (timingId){ setMins(n.dataset.d, timingId, v); save(); }
+    timingId = null; render(); return;
   }
   if (act === "del"){
     var tid = n.dataset.id;
@@ -1967,8 +2172,8 @@ function doAct(act, n){
     cdraft = { sleep:"", wake:"", score:0 };
     editingCond = false; save(); render(); return;
   }
-  if (act === "prevday"){ if (dayOffset > -3650){ dayOffset--; render(); } return; }
-  if (act === "nextday"){ if (dayOffset <  365){ dayOffset++; render(); } return; }
+  if (act === "prevday"){ if (dayOffset > -3650){ dayOffset--; timingId = null; render(); } return; }
+  if (act === "nextday"){ if (dayOffset <  365){ dayOffset++; timingId = null; render(); } return; }
   if (act === "jumptoday"){ dayOffset = 0; render(); return; }
   if (act === "prevweek"){ if (weekOffset > -520){ weekOffset--; render(); } return; }
   if (act === "nextweek"){ if (weekOffset <   52){ weekOffset++; render(); } return; }
@@ -2024,7 +2229,7 @@ function render2(what){
 document.querySelectorAll(".tabs button").forEach(function(b){
   b.addEventListener("click", function(){
     var prev = view;
-    view = b.dataset.v; pendingReport = null; editingId = null;
+    view = b.dataset.v; pendingReport = null; editingId = null; timingId = null;
     /* 컨디션 ↔ 일간 share a date, so keep the cursor when moving between them */
     var dayPair = (prev === "cond" || prev === "day") && (view === "cond" || view === "day");
     if (!dayPair) dayOffset = 0;
