@@ -775,9 +775,11 @@ function dayComment(pts, tgt, hrs, score, ds){
   if (pts >= tgt) s = "오늘 목표 찍었어. 남은 시간은 온전히 네 거야.";
   else if (pts > 0) s = pts + "pt 쌓였어.";
   else s = "오늘은 기록만 남겼네. 그것도 남긴 거야.";
+  /* Never turn sleep into an expectation — "you rested well" quietly becomes
+     "so you should have done more". Sleep gets stated, never cashed in. */
   if (hrs !== null){
-    if (hrs < 6) s += " 잠이 " + hrs.toFixed(1) + "시간이었네 — 오늘 기대치는 좀 낮춰도 괜찮아.";
-    else if (hrs >= 8) s += " " + hrs.toFixed(1) + "시간 잤으면 잘 쉰 거야.";
+    if (hrs < 6) s += " 잠이 " + hrs.toFixed(1) + "시간이었네. 오늘 기대치는 낮춰도 괜찮아.";
+    else s += " " + hrs.toFixed(1) + "시간 잤어도 피로는 쌓여 있을 수 있어. 무리하지 마.";
   }
   return s;
 }
