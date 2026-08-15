@@ -79,13 +79,22 @@
 }
 
 *{box-sizing:border-box}
+html{touch-action:manipulation}          /* kills double-tap-to-zoom, keeps pinch */
 body{
   margin:0; background:var(--bg); color:var(--ink);
   font-family:var(--font-ui);
   font-size:15px; line-height:1.5;
   -webkit-text-size-adjust:100%;
+  touch-action:manipulation;
   padding:0 0 64px;
 }
+button,.row,.chip,.tabs button,.condpick button,.seg button,.dowpick button{
+  touch-action:manipulation;
+}
+.tnote{margin-top:12px;padding:11px 13px;border-radius:9px;background:var(--good-soft);
+  border:1px solid color-mix(in srgb,var(--good) 28%,transparent);
+  font-size:12.5px;line-height:1.6;color:var(--good)}
+.tnote b{font-weight:700}
 .wrap{max-width:620px;margin:0 auto;padding:20px 16px 0}
 
 /* ── masthead ─────────────────────────────────────────────────── */
@@ -622,6 +631,22 @@ function sleepHours(c){
   return Math.round(mins/6)/10;
 }
 function condOn(ds){ return S.cond[ds] || null; }
+
+/* A rough day earns a smaller finish line. Offsets, not fixed numbers, so this
+   still holds if the base target is moved in settings. */
+function targetFor(ds){
+  var base = S.dailyTarget, c = condOn(ds);
+  if (!c || !c.score) return base;
+  if (c.score === 1) return Math.max(1, base - 2);
+  if (c.score === 2) return Math.max(1, base - 1);
+  return base;
+}
+function targetNote(ds){
+  var c = condOn(ds);
+  if (!c || !c.score || c.score > 2) return "";
+  return '<div class="tnote">컨디션이 <b>'+ CLABEL[c.score] +'</b>이라 오늘 목표를 '
+       + targetFor(ds) +'pt로 낮췄어. 그만큼이면 오늘 몫은 다 한 거야.</div>';
+}
 function setCond(ds, key, val){
   if (!S.cond[ds]) S.cond[ds] = {};
   if (val === null || val === "") delete S.cond[ds][key];
@@ -759,7 +784,7 @@ function viewCond(d){
   var open  = editingCond || !saved;
   var src   = open ? cdraft : saved;
   var hrs   = sleepHours(src);
-  var pts = ptsOn(ds), tgt = S.dailyTarget;
+  var pts = ptsOn(ds), tgt = targetFor(ds);
 
   var h = '<div class="card">';
   h += dayNav(d);
@@ -843,7 +868,7 @@ function patchSleep(){
   var val = el("dSleepVal");
   if (val) val.innerHTML = sleepText(src, hrs);
   var note = el("dnote");
-  if (note) note.textContent = "🐙 " + dayComment(ptsOn(ds), S.dailyTarget, hrs, src.score, ds);
+  if (note) note.textContent = "🐙 " + dayComment(ptsOn(ds), targetFor(ds), hrs, src.score, ds);
 
   var filled = !!(cdraft.sleep || cdraft.wake || cdraft.score);
   var sub = document.querySelector('[data-act="submitcond"]');
@@ -1161,7 +1186,7 @@ function viewInsights(){
    Someone having a hard day does not need yesterday's number on screen. */
 function viewCompare(d){
   var ds = iso(d), ps = iso(addDays(d,-1));
-  var T = ptsOn(ds), Y = ptsOn(ps), G = S.dailyTarget;
+  var T = ptsOn(ds), Y = ptsOn(ps), G = targetFor(ds);
   var future = ds > iso(today());
   var hit = T >= G, up = T > Y;
   var pct = (Y > 0) ? Math.round((T - Y) / Y * 100) : null;
@@ -1251,7 +1276,7 @@ function compareMsg(T, Y, G, pct, future){
 
 /* ── 일간 ── */
 function viewDay(d){
-  var ds = iso(d), tgt = S.dailyTarget, got = ptsOn(ds);
+  var ds = iso(d), tgt = targetFor(ds), got = ptsOn(ds);
   var list = tasksFor(d);
 
   /* the track: completed tasks occupy blocks proportional to their points */
@@ -1281,6 +1306,7 @@ function viewDay(d){
      +  (hit ? '초과 <b>+'+ (got-tgt) +'</b> pt' : '남은 <b>'+ left +'</b> pt') +'</div></div>';
   h += '<div class="track" style="grid-template-columns:repeat('+tgt+',1fr)">'+ blocks +'</div>';
   h += '<div class="track-legend"><span>0</span><span>'+ tgt +' pt</span></div>';
+  h += targetNote(ds);
 
   if (overflow > 0){
     h += '<div class="bonus"><span>보너스 +'+ overflow +'</span>'
@@ -1394,12 +1420,12 @@ function viewWeek(ws){
   } else {
     h += '<div class="readout"><div class="big">'+ pct +'<em>%</em></div>'
        + '<div class="side"><b>'+ got +'</b> / '+ tgt +' pt<br>목표 달성 <b>'
-       + day.filter(function(x){return x.p>=S.dailyTarget;}).length +'</b> / 7일</div></div>';
+       + day.filter(function(x){return x.p >= targetFor(x.ds);}).length +'</b> / 7일</div></div>';
   }
 
   h += '<div class="days">';
   day.forEach(function(x){
-    var cls = x.p >= S.dailyTarget ? "hit" : (x.p > 0 ? "some" : "");
+    var cls = x.p >= targetFor(x.ds) ? "hit" : (x.p > 0 ? "some" : "");
     if (x.ds === td) cls += " today";
     var hpx = x.p ? Math.max(4, Math.round(x.p/maxp*76)) : 3;
     h += '<div class="day '+cls+'"><div class="pt">'+ (x.p||"·") +'</div>'
@@ -1570,7 +1596,8 @@ function buildReport(ws){
     wno: weekNo(ws), key: weekKey(ws),
     range: md(ws) + " → " + md(addDays(ws,6)),
     total: total, byDay: byDay, tiers: tiers, sleep: sleep, cond: cond,
-    hits: byDay.filter(function(p){ return p >= S.dailyTarget; }).length,
+    targets: byDay.map(function(_,i){ return targetFor(iso(addDays(ws,i))); }),
+    hits: byDay.filter(function(p,i){ return p >= targetFor(iso(addDays(ws,i))); }).length,
     target: S.weeklyTarget,
     routines: routines, onces: oncesDone,
     claimed: S.rewards.filter(function(r){ return r.claimed; }).length
@@ -1578,6 +1605,8 @@ function buildReport(ws){
 }
 
 function viewReport(r, prev, isPreview){
+  var tgs = r.targets || [];
+  var tg = function(i){ return tgs[i] || S.dailyTarget; };
   var max = Math.max.apply(null, r.byDay.concat([S.dailyTarget]));
   var delta = prev ? r.total - prev.total : null;
   var pct = r.target ? Math.round(r.total/r.target*100) : 0;
@@ -1592,7 +1621,7 @@ function viewReport(r, prev, isPreview){
 
   h += '<div class="days">';
   r.byDay.forEach(function(p,i){
-    var cls = p >= S.dailyTarget ? "hit" : (p > 0 ? "some" : "");
+    var cls = p >= tg(i) ? "hit" : (p > 0 ? "some" : "");
     var hpx = p ? Math.max(4, Math.round(p/max*76)) : 3;
     h += '<div class="day '+cls+'"><div class="pt">'+ (p||"·") +'</div>'
        + '<div class="stack" style="height:'+hpx+'px"></div></div>';
@@ -1841,7 +1870,8 @@ function doAct(act, n){
     var after = Math.round(weekPts(ws)/S.weeklyTarget*100);
     var dayNow = ptsOn(iso(today()));
 
-    if (dayNow >= S.dailyTarget && dayNow - PTS[taskById(id).tier] < S.dailyTarget && ds === iso(today())){
+    var todayTgt = targetFor(iso(today()));
+    if (dayNow >= todayTgt && dayNow - PTS[taskById(id).tier] < todayTgt && ds === iso(today())){
       toast("오늘 할 일 다 했다 🐙");
     } else {
       S.rewards.forEach(function(r){
