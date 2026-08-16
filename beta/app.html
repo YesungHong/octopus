@@ -601,8 +601,10 @@ img.pix{image-rendering:pixelated}
 .dexcell.walk{border-color:var(--accent);border-width:2px;box-shadow:0 0 0 2px var(--accent-soft)}
 .dexcell.walk::after{content:"산책";position:absolute;left:2px;top:1px;font-size:8.5px;
   font-weight:700;color:var(--accent-ink);background:var(--accent-soft);border-radius:4px;padding:0 3px}
-.dexcell.full{border-color:var(--good)}
-.dexcell.full .cnt{color:var(--good)}
+/* the whole grid turns when the set is finished — a scatter of green cells
+   read as noise rather than as an achievement */
+.dexgrid.done .dexcell{border-color:var(--good)}
+.dexgrid.done .dexcell .cnt{color:var(--good)}
 .mrow{display:flex;gap:8px;align-items:center;padding:8px 10px;border-radius:9px;
   background:var(--surface-2);border:1px solid var(--line-soft);margin-top:7px}
 .mrow img{width:38px;height:38px;flex:none;object-fit:contain}
@@ -2451,13 +2453,12 @@ function gachaCard(){
   }
 
   if (dexOpen){
-    h+='<div class="dexgrid">';
+    h+='<div class="dexgrid'+(got>=tot?' done':'')+'">';
     D.ids.forEach(function(id){
       var seen=!!st.dex[id], n=st.hold[id]||0;
       var leg=(k==="pk" && DEX[id].leg && seen);
-      var full=(D.cap && n>=D.cap);
       var pk2=S.petPick, walking=(seen && pk2 && pk2.k===k && String(pk2.id)===String(id));
-      h+='<div class="dexcell'+(seen?'':' miss')+(leg?' leg':'')+(full?' full':'')
+      h+='<div class="dexcell'+(seen?'':' miss')+(leg?' leg':'')
        + (walking?' walk':'')+'" '
        + (seen?'role="button" tabindex="0" data-act="petset" data-k="'+k+'" data-id="'+id+'" ':'')
        + 'title="'+(seen?esc(D.nm(id)):"?")+'">'
@@ -2465,6 +2466,9 @@ function gachaCard(){
        + (n>1?'<span class="cnt">×'+n+'</span>':'')+'</div>';
     });
     h+='</div>';
+    if (got>=tot)
+      h+='<div class="studyhint" style="text-align:left;color:var(--good)"><b>'
+       + esc(D.label)+' 도감 완성.</b> '+tot+'종 전부 모았어.</div>';
     h+='<div class="studyhint" style="text-align:left">잡은 칸을 누르면 그 애가 산책해. 지금은 <b>'
      + (petChosen() ? esc(SET(petChosen().k).nm(petChosen().id)) : "없음") + '</b>.</div>';
   }
