@@ -558,6 +558,8 @@ button,.row,.chip,.tabs button,.condpick button,.seg button,.dowpick button{
 .hide{display:none !important}
 img.pix{image-rendering:pixelated}
 .gset{margin:10px 0 2px}
+.bkask .bkrow{display:flex;gap:8px;margin-top:10px}
+.bkask .bkrow button{flex:1;padding:10px;font-size:13px}
 /* the gacha readout counts a handful of tickets, not a 3-digit percentage —
    the shared 44px display number reads as a shout at that scale */
 .greadout .big{font-size:26px}
@@ -1075,6 +1077,7 @@ function weekNo(ws){
   return 33 + Math.round(diff / 604800000);
 }
 function weekKey(ws){ return ws.getFullYear() + "-W" + weekNo(ws); }
+function monthKey(d){ return d.getFullYear() + "-" + String(d.getMonth()+1).padStart(2,"0"); }
 function md(d){ return (d.getMonth()+1) + "/" + d.getDate(); }
 
 /* ───────── state ───────── */
@@ -1098,6 +1101,7 @@ function blank(){
     reports: [],
     seenWeek: null,
     lastBackup: null,
+    backupAsked: null,          /* "YYYY-MM" — 이 달의 백업 물음에 이미 답했다 */
     gacha: { used:0, dex:{}, hold:{}, last:null }
   };
 }
@@ -1145,6 +1149,9 @@ function load(){
       if (!Object.keys(store[d]).length) delete store[d];
     }
   });
+  /* seed on first run so the question starts at the next month boundary
+     rather than firing the moment this version lands mid-month */
+  if (!S.backupAsked) S.backupAsked = monthKey(today());
   return S;
 }
 
@@ -1340,11 +1347,11 @@ function render(){
   document.querySelectorAll(".tabs button").forEach(function(b){
     b.setAttribute("aria-selected", b.dataset.v === view ? "true" : "false");
   });
-  var v = el("view");
-  if (view === "cond") v.innerHTML = viewCond(cursorDay());
-  if (view === "day")  v.innerHTML = viewDay(cursorDay());
-  if (view === "week") v.innerHTML = viewWeek(cursorWeek());
-  if (view === "all")  v.innerHTML = viewAll();
+  var v = el("view"), top = backupDue() ? backupBanner() : "";
+  if (view === "cond") v.innerHTML = top + viewCond(cursorDay());
+  if (view === "day")  v.innerHTML = top + viewDay(cursorDay());
+  if (view === "week") v.innerHTML = top + viewWeek(cursorWeek());
+  if (view === "all")  v.innerHTML = top + viewAll();
   wire();
 }
 
@@ -2675,6 +2682,30 @@ var editingCond = false, cdraftDate = null;
 var timingId = null;
 var cdraft = { sleep:"", wake:"", score:0 };
 
+function exportBoard(){
+  var stamp = iso(today());
+  var blob = new Blob([JSON.stringify(S, null, 2)], {type:"application/json"});
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement("a");
+  a.href = url; a.download = BKNAME + stamp + ".json";
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  setTimeout(function(){ URL.revokeObjectURL(url); }, 4000);
+  S.lastBackup = Date.now(); save();
+}
+
+/* Asked once when a new month is first opened — not only on the 1st, so it
+   still comes around for someone who did not open the app that day. */
+function backupDue(){ return S.backupAsked !== monthKey(today()); }
+function backupBanner(){
+  var d=today();
+  return '<div class="warn bkask">'
+    + '<b>'+(d.getMonth()+1)+'월이 시작됐어.</b> 지금까지 기록을 백업 파일로 저장해둘까?'
+    + '<div class="bkrow">'
+    +   '<button class="pull" data-act="bkyes">저장할게</button>'
+    +   '<button class="dexbtn" data-act="bkno">안 할래</button>'
+    + '</div></div>';
+}
+
 function toast(msg){
   var t = el("toast");
   t.textContent = msg; t.classList.add("up");
@@ -3038,15 +3069,18 @@ function doAct(act, n){
   if (act === "nextweek"){ if (weekOffset <   52){ weekOffset++; render(); } return; }
   if (act === "jumpweek"){ weekOffset = 0; render(); return; }
   if (act === "expjson"){
-    var stamp = iso(today());
-    var blob = new Blob([JSON.stringify(S, null, 2)], {type:"application/json"});
-    var url = URL.createObjectURL(blob);
-    var a = document.createElement("a");
-    a.href = url; a.download = BKNAME + stamp + ".json";
-    document.body.appendChild(a); a.click(); document.body.removeChild(a);
-    setTimeout(function(){ URL.revokeObjectURL(url); }, 4000);
-    S.lastBackup = Date.now(); save(); render2("settings");
+    exportBoard(); render2("settings");
     toast("백업 파일 저장했어 🐙");
+    return;
+  }
+  if (act === "bkyes"){
+    exportBoard();
+    S.backupAsked = monthKey(today()); save(); render();
+    toast("백업 파일 저장했어 🐙");
+    return;
+  }
+  if (act === "bkno"){
+    S.backupAsked = monthKey(today()); save(); render();
     return;
   }
   if (act === "impjson"){ var f = el("impfile"); if (f) f.click(); return; }
