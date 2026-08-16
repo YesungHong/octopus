@@ -556,6 +556,52 @@ button,.row,.chip,.tabs button,.condpick button,.seg button,.dowpick button{
 .warn{background:var(--accent-soft);border:1px solid var(--accent);color:var(--accent-ink);
   padding:11px 13px;border-radius:9px;font-size:12.5px;line-height:1.6;margin-bottom:14px}
 .hide{display:none !important}
+img.pix{image-rendering:pixelated}
+.gset{margin:10px 0 2px}
+.bkask .bkrow{display:flex;gap:8px;margin-top:10px}
+.bkask .bkrow button{flex:1;padding:10px;font-size:13px}
+/* the gacha readout counts a handful of tickets, not a 3-digit percentage —
+   the shared 44px display number reads as a shout at that scale */
+.greadout .big{font-size:26px}
+.greadout .big em{font-size:13px}
+.greadout{margin-bottom:11px}
+.greadout .big.owe{color:var(--ink-3)}
+.readout .side .rate{color:var(--ink-3);font-size:11px}
+.gline{display:flex;gap:9px;align-items:center;margin:11px 0 3px}
+.gline .pull{flex:1;padding:13px;border-radius:10px;border:0;font:inherit;font-weight:700;
+  font-size:14px;background:var(--accent);color:#fff;cursor:pointer}
+.gline .pull[disabled]{background:var(--sunk);color:var(--ink-3);cursor:default}
+.gline .dexbtn{padding:13px 15px;border-radius:10px;border:1px solid var(--line);
+  background:var(--surface);color:var(--ink-2);font:inherit;font-size:13px;cursor:pointer}
+.gres{display:flex;gap:13px;align-items:center;margin-top:12px;padding:12px;
+  border-radius:11px;background:var(--surface-2);border:1px solid var(--line-soft)}
+.gres img{width:74px;height:74px;flex:none;object-fit:contain}
+.gres .nm{font-size:16px;font-weight:700;line-height:1.35}
+.gres .mt{font-size:11.5px;color:var(--ink-3);margin-top:3px}
+.gnew{display:inline-block;margin-left:6px;padding:1px 6px;border-radius:5px;
+  background:var(--good-soft);color:var(--good);font-size:10px;font-weight:700;letter-spacing:.06em}
+.gdup{display:inline-block;margin-left:6px;padding:1px 6px;border-radius:5px;
+  background:var(--sunk);color:var(--ink-3);font-size:10px;font-weight:700}
+.dexgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(52px,1fr));
+  gap:5px;margin-top:11px}
+.dexcell{position:relative;aspect-ratio:1;border-radius:8px;background:var(--surface-2);
+  border:1px solid var(--line-soft);display:flex;align-items:center;justify-content:center}
+.dexcell img{width:100%;height:100%;object-fit:contain}
+.dexcell.miss img{filter:brightness(0);opacity:.17}
+.dexcell .cnt{position:absolute;right:2px;bottom:1px;font-size:9.5px;font-weight:700;
+  color:var(--ink-3)}
+.dexcell.leg{border-color:var(--accent);background:var(--accent-soft)}
+.mrow{display:flex;gap:8px;align-items:center;padding:8px 10px;border-radius:9px;
+  background:var(--surface-2);border:1px solid var(--line-soft);margin-top:7px}
+.mrow img{width:38px;height:38px;flex:none;object-fit:contain}
+.mrow .nm{flex:1;font-size:13px;font-weight:600}
+.mrow button{padding:7px 11px;border-radius:8px;border:0;background:var(--accent);
+  color:#fff;font:inherit;font-size:12px;font-weight:700;cursor:pointer}
+.mpick{display:flex;flex-wrap:wrap;gap:6px;margin-top:7px}
+.mpick button{display:flex;flex-direction:column;align-items:center;gap:2px;
+  padding:7px 9px;border-radius:9px;border:1px solid var(--line);
+  background:var(--surface);color:var(--ink);font:inherit;font-size:11px;cursor:pointer}
+.mpick img{width:40px;height:40px;object-fit:contain}
 .betabadge{display:inline-block;vertical-align:middle;margin-left:7px;
   padding:2px 7px;border-radius:6px;border:1px solid var(--accent);
   background:var(--accent-soft);color:var(--accent-ink);
@@ -604,6 +650,418 @@ if (IS_BETA){
   if (_bb) _bb.classList.remove("hide");
 }
 
+/* ───────── 뽑기 · 포켓몬 도감 (1·2세대) ─────────
+   Tickets come from measured study minutes, but never from sitting still:
+   minutes can only be attached to a quest that was completed, so a ticket
+   always stands behind a finished thing. Deliberately kept out of the pt
+   tracks — this is a collection, not a score. */
+var DEXR=[
+[1,"이상해씨","풀/독",1,1,"2",0],
+[2,"이상해풀","풀/독",2,1,"3",0],
+[3,"이상해꽃","풀/독",3,1,"",0],
+[4,"파이리","불꽃",1,2,"5",0],
+[5,"리자드","불꽃",2,2,"6",0],
+[6,"리자몽","불꽃/비행",3,2,"",0],
+[7,"꼬부기","물",1,3,"8",0],
+[8,"어니부기","물",2,3,"9",0],
+[9,"거북왕","물",3,3,"",0],
+[10,"캐터피","벌레",1,4,"11",0],
+[11,"단데기","벌레",2,4,"12",0],
+[12,"버터플","벌레/비행",3,4,"",0],
+[13,"뿔충이","벌레/독",1,5,"14",0],
+[14,"딱충이","벌레/독",2,5,"15",0],
+[15,"독침붕","벌레/독",3,5,"",0],
+[16,"구구","노말/비행",1,6,"17",0],
+[17,"피죤","노말/비행",2,6,"18",0],
+[18,"피죤투","노말/비행",3,6,"",0],
+[19,"꼬렛","노말",1,7,"20",0],
+[20,"레트라","노말",2,7,"",0],
+[21,"깨비참","노말/비행",1,8,"22",0],
+[22,"깨비드릴조","노말/비행",2,8,"",0],
+[23,"아보","독",1,9,"24",0],
+[24,"아보크","독",2,9,"",0],
+[25,"피카츄","전기",2,10,"26",0],
+[26,"라이츄","전기",3,10,"",0],
+[27,"모래두지","땅",1,11,"28",0],
+[28,"고지","땅",2,11,"",0],
+[29,"니드런♀","독",1,12,"30",0],
+[30,"니드리나","독",2,12,"31",0],
+[31,"니드퀸","독/땅",3,12,"",0],
+[32,"니드런♂","독",1,13,"33",0],
+[33,"니드리노","독",2,13,"34",0],
+[34,"니드킹","독/땅",3,13,"",0],
+[35,"삐삐","페어리",2,14,"36",0],
+[36,"픽시","페어리",3,14,"",0],
+[37,"식스테일","불꽃",1,15,"38",0],
+[38,"나인테일","불꽃",2,15,"",0],
+[39,"푸린","노말/페어리",2,16,"40",0],
+[40,"푸크린","노말/페어리",3,16,"",0],
+[41,"주뱃","독/비행",1,17,"42",0],
+[42,"골뱃","독/비행",2,17,"169",0],
+[43,"뚜벅쵸","풀/독",1,18,"44",0],
+[44,"냄새꼬","풀/독",2,18,"45,182",0],
+[45,"라플레시아","풀/독",3,18,"",0],
+[46,"파라스","벌레/풀",1,19,"47",0],
+[47,"파라섹트","벌레/풀",2,19,"",0],
+[48,"콘팡","벌레/독",1,20,"49",0],
+[49,"도나리","벌레/독",2,20,"",0],
+[50,"디그다","땅",1,21,"51",0],
+[51,"닥트리오","땅",2,21,"",0],
+[52,"나옹","노말",1,22,"53",0],
+[53,"페르시온","노말",2,22,"",0],
+[54,"고라파덕","물",1,23,"55",0],
+[55,"골덕","물",2,23,"",0],
+[56,"망키","격투",1,24,"57",0],
+[57,"성원숭","격투",2,24,"",0],
+[58,"가디","불꽃",1,25,"59",0],
+[59,"윈디","불꽃",2,25,"",0],
+[60,"발챙이","물",1,26,"61",0],
+[61,"슈륙챙이","물",2,26,"62,186",0],
+[62,"강챙이","물/격투",3,26,"",0],
+[63,"캐이시","에스퍼",1,27,"64",0],
+[64,"윤겔라","에스퍼",2,27,"65",0],
+[65,"후딘","에스퍼",3,27,"",0],
+[66,"알통몬","격투",1,28,"67",0],
+[67,"근육몬","격투",2,28,"68",0],
+[68,"괴력몬","격투",3,28,"",0],
+[69,"모다피","풀/독",1,29,"70",0],
+[70,"우츠동","풀/독",2,29,"71",0],
+[71,"우츠보트","풀/독",3,29,"",0],
+[72,"왕눈해","물/독",1,30,"73",0],
+[73,"독파리","물/독",2,30,"",0],
+[74,"꼬마돌","바위/땅",1,31,"75",0],
+[75,"데구리","바위/땅",2,31,"76",0],
+[76,"딱구리","바위/땅",3,31,"",0],
+[77,"포니타","불꽃",1,32,"78",0],
+[78,"날쌩마","불꽃",2,32,"",0],
+[79,"야돈","물/에스퍼",1,33,"80,199",0],
+[80,"야도란","물/에스퍼",2,33,"",0],
+[81,"코일","전기/강철",1,34,"82",0],
+[82,"레어코일","전기/강철",2,34,"",0],
+[83,"파오리","노말/비행",1,35,"",0],
+[84,"두두","노말/비행",1,36,"85",0],
+[85,"두트리오","노말/비행",2,36,"",0],
+[86,"쥬쥬","물",1,37,"87",0],
+[87,"쥬레곤","물/얼음",2,37,"",0],
+[88,"질퍽이","독",1,38,"89",0],
+[89,"질뻐기","독",2,38,"",0],
+[90,"셀러","물",1,39,"91",0],
+[91,"파르셀","물/얼음",2,39,"",0],
+[92,"고오스","고스트/독",1,40,"93",0],
+[93,"고우스트","고스트/독",2,40,"94",0],
+[94,"팬텀","고스트/독",3,40,"",0],
+[95,"롱스톤","바위/땅",1,41,"208",0],
+[96,"슬리프","에스퍼",1,42,"97",0],
+[97,"슬리퍼","에스퍼",2,42,"",0],
+[98,"크랩","물",1,43,"99",0],
+[99,"킹크랩","물",2,43,"",0],
+[100,"찌리리공","전기",1,44,"101",0],
+[101,"붐볼","전기",2,44,"",0],
+[102,"아라리","풀/에스퍼",1,45,"103",0],
+[103,"나시","풀/에스퍼",2,45,"",0],
+[104,"탕구리","땅",1,46,"105",0],
+[105,"텅구리","땅",2,46,"",0],
+[106,"시라소몬","격투",2,47,"",0],
+[107,"홍수몬","격투",2,47,"",0],
+[108,"내루미","노말",1,48,"",0],
+[109,"또가스","독",1,49,"110",0],
+[110,"또도가스","독",2,49,"",0],
+[111,"뿔카노","땅/바위",1,50,"112",0],
+[112,"코뿌리","땅/바위",2,50,"",0],
+[113,"럭키","노말",1,51,"242",0],
+[114,"덩쿠리","풀",1,52,"",0],
+[115,"캥카","노말",1,53,"",0],
+[116,"쏘드라","물",1,54,"117",0],
+[117,"시드라","물",2,54,"230",0],
+[118,"콘치","물",1,55,"119",0],
+[119,"왕콘치","물",2,55,"",0],
+[120,"별가사리","물",1,56,"121",0],
+[121,"아쿠스타","물/에스퍼",2,56,"",0],
+[122,"마임맨","에스퍼/페어리",1,57,"",0],
+[123,"스라크","벌레/비행",1,58,"212",0],
+[124,"루주라","얼음/에스퍼",2,59,"",0],
+[125,"에레브","전기",2,60,"",0],
+[126,"마그마","불꽃",2,61,"",0],
+[127,"쁘사이저","벌레",1,62,"",0],
+[128,"켄타로스","노말",1,63,"",0],
+[129,"잉어킹","물",1,64,"130",0],
+[130,"갸라도스","물/비행",2,64,"",0],
+[131,"라프라스","물/얼음",1,65,"",0],
+[132,"메타몽","노말",1,66,"",0],
+[133,"이브이","노말",1,67,"134,135,136,196,197",0],
+[134,"샤미드","물",2,67,"",0],
+[135,"쥬피썬더","전기",2,67,"",0],
+[136,"부스터","불꽃",2,67,"",0],
+[137,"폴리곤","노말",1,68,"233",0],
+[138,"암나이트","바위/물",1,69,"139",0],
+[139,"암스타","바위/물",2,69,"",0],
+[140,"투구","바위/물",1,70,"141",0],
+[141,"투구푸스","바위/물",2,70,"",0],
+[142,"프테라","바위/비행",1,71,"",0],
+[143,"잠만보","노말",1,72,"",0],
+[144,"프리져","얼음/비행",1,73,"",1],
+[145,"썬더","전기/비행",1,74,"",1],
+[146,"파이어","불꽃/비행",1,75,"",1],
+[147,"미뇽","드래곤",1,76,"148",0],
+[148,"신뇽","드래곤",2,76,"149",0],
+[149,"망나뇽","드래곤/비행",3,76,"",0],
+[150,"뮤츠","에스퍼",1,77,"",1],
+[151,"뮤","에스퍼",1,78,"",1],
+[152,"치코리타","풀",1,79,"153",0],
+[153,"베이리프","풀",2,79,"154",0],
+[154,"메가니움","풀",3,79,"",0],
+[155,"브케인","불꽃",1,80,"156",0],
+[156,"마그케인","불꽃",2,80,"157",0],
+[157,"블레이범","불꽃",3,80,"",0],
+[158,"리아코","물",1,81,"159",0],
+[159,"엘리게이","물",2,81,"160",0],
+[160,"장크로다일","물",3,81,"",0],
+[161,"꼬리선","노말",1,82,"162",0],
+[162,"다꼬리","노말",2,82,"",0],
+[163,"부우부","노말/비행",1,83,"164",0],
+[164,"야부엉","노말/비행",2,83,"",0],
+[165,"레디바","벌레/비행",1,84,"166",0],
+[166,"레디안","벌레/비행",2,84,"",0],
+[167,"페이검","벌레/독",1,85,"168",0],
+[168,"아리아도스","벌레/독",2,85,"",0],
+[169,"크로뱃","독/비행",3,17,"",0],
+[170,"초라기","물/전기",1,86,"171",0],
+[171,"랜턴","물/전기",2,86,"",0],
+[172,"피츄","전기",1,10,"25",0],
+[173,"삐","페어리",1,14,"35",0],
+[174,"푸푸린","노말/페어리",1,16,"39",0],
+[175,"토게피","페어리",1,87,"176",0],
+[176,"토게틱","페어리/비행",2,87,"",0],
+[177,"네이티","에스퍼/비행",1,88,"178",0],
+[178,"네이티오","에스퍼/비행",2,88,"",0],
+[179,"메리프","전기",1,89,"180",0],
+[180,"보송송","전기",2,89,"181",0],
+[181,"전룡","전기",3,89,"",0],
+[182,"아르코","풀",3,18,"",0],
+[183,"마릴","물/페어리",1,90,"184",0],
+[184,"마릴리","물/페어리",2,90,"",0],
+[185,"꼬지모","바위",1,91,"",0],
+[186,"왕구리","물",3,26,"",0],
+[187,"통통코","풀/비행",1,92,"188",0],
+[188,"두코","풀/비행",2,92,"189",0],
+[189,"솜솜코","풀/비행",3,92,"",0],
+[190,"에이팜","노말",1,93,"",0],
+[191,"해너츠","풀",1,94,"192",0],
+[192,"해루미","풀",2,94,"",0],
+[193,"왕자리","벌레/비행",1,95,"",0],
+[194,"우파","물/땅",1,96,"195",0],
+[195,"누오","물/땅",2,96,"",0],
+[196,"에브이","에스퍼",2,67,"",0],
+[197,"블래키","악",2,67,"",0],
+[198,"니로우","악/비행",1,97,"",0],
+[199,"야도킹","물/에스퍼",2,33,"",0],
+[200,"무우마","고스트",1,98,"",0],
+[201,"안농","에스퍼",1,99,"",0],
+[202,"마자용","에스퍼",1,100,"",0],
+[203,"키링키","노말/에스퍼",1,101,"",0],
+[204,"피콘","벌레",1,102,"205",0],
+[205,"쏘콘","벌레/강철",2,102,"",0],
+[206,"노고치","노말",1,103,"",0],
+[207,"글라이거","땅/비행",1,104,"",0],
+[208,"강철톤","강철/땅",2,41,"",0],
+[209,"블루","페어리",1,105,"210",0],
+[210,"그랑블루","페어리",2,105,"",0],
+[211,"침바루","물/독",1,106,"",0],
+[212,"핫삼","벌레/강철",2,58,"",0],
+[213,"단단지","벌레/바위",1,107,"",0],
+[214,"헤라크로스","벌레/격투",1,108,"",0],
+[215,"포푸니","악/얼음",1,109,"",0],
+[216,"깜지곰","노말",1,110,"217",0],
+[217,"링곰","노말",2,110,"",0],
+[218,"마그마그","불꽃",1,111,"219",0],
+[219,"마그카르고","불꽃/바위",2,111,"",0],
+[220,"꾸꾸리","얼음/땅",1,112,"221",0],
+[221,"메꾸리","얼음/땅",2,112,"",0],
+[222,"코산호","물/바위",1,113,"",0],
+[223,"총어","물",1,114,"224",0],
+[224,"대포무노","물",2,114,"",0],
+[225,"딜리버드","얼음/비행",1,115,"",0],
+[226,"만타인","물/비행",1,116,"",0],
+[227,"무장조","강철/비행",1,117,"",0],
+[228,"델빌","악/불꽃",1,118,"229",0],
+[229,"헬가","악/불꽃",2,118,"",0],
+[230,"킹드라","물/드래곤",3,54,"",0],
+[231,"코코리","땅",1,119,"232",0],
+[232,"코리갑","땅",2,119,"",0],
+[233,"폴리곤2","노말",2,68,"",0],
+[234,"노라키","노말",1,120,"",0],
+[235,"루브도","노말",1,121,"",0],
+[236,"배루키","격투",1,47,"106,107,237",0],
+[237,"카포에라","격투",2,47,"",0],
+[238,"뽀뽀라","얼음/에스퍼",1,59,"124",0],
+[239,"에레키드","전기",1,60,"125",0],
+[240,"마그비","불꽃",1,61,"126",0],
+[241,"밀탱크","노말",1,122,"",0],
+[242,"해피너스","노말",2,51,"",0],
+[243,"라이코","전기",1,123,"",1],
+[244,"앤테이","불꽃",1,124,"",1],
+[245,"스이쿤","물",1,125,"",1],
+[246,"애버라스","바위/땅",1,126,"247",0],
+[247,"데기라스","바위/땅",2,126,"248",0],
+[248,"마기라스","바위/악",3,126,"",0],
+[249,"루기아","에스퍼/비행",1,127,"",1],
+[250,"칠색조","불꽃/비행",1,128,"",1],
+[251,"세레비","에스퍼/풀",1,129,"",1]
+];
+
+var DEX={}, LINES={}, DIDS=[];
+DEXR.forEach(function(r){
+  DEX[r[0]]={id:r[0],ko:r[1],ty:r[2],stage:r[3],line:r[4],
+             to:r[5]?String(r[5]).split(",").map(Number):[],leg:!!r[6]};
+  DIDS.push(r[0]);
+  (LINES[r[4]]=LINES[r[4]]||[]).push(r[0]);
+});
+
+/* Minutes are the currency, not tickets. Each set prices a pull differently,
+   and a ticket count can't be shared across two prices. Spending in minutes
+   also makes an edited study time behave exactly as expected: changing 30min
+   to 60min adds 30 minutes of pulling power, no rounding drift either way. */
+var COST = { pk:20, sr:30 };
+var STW  = {1:9, 2:3, 3:1};   /* each evolution step is 3x rarer */
+var LEGRATE = 0.005;          /* legendary+mythical share of a full pool */
+var LEGW = (function(){
+  var wnl=0, nl=0;
+  DIDS.forEach(function(i){ if (DEX[i].leg) nl++; else wnl += STW[DEX[i].stage]; });
+  return (LEGRATE*wnl/(1-LEGRATE))/nl;
+})();
+function gw(i){ return DEX[i].leg ? LEGW : STW[DEX[i].stage]; }
+function sprite(id){
+  return "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/"+id+".png";
+}
+
+/* ───────── 외부 팩 ─────────
+   A pack carries its own artwork and its own item list. Nothing from a pack
+   ships with this app or lives in the repository — it is imported from a file
+   and kept in this browser only, under its own storage key so a board backup
+   stays small and the two files never get confused for each other. */
+var PACKKEY = IS_BETA ? "octopus.pack.sr.beta" : "octopus.pack.sr";
+var PACK=null, SRBY={}, SRG={}, SRIDS=[];
+function packInstall(p){
+  PACK=p; SRBY={}; SRG={}; SRIDS=[];
+  (p.items||[]).forEach(function(it){
+    SRBY[it.id]=it; SRIDS.push(it.id);
+    (SRG[it.slug]=SRG[it.slug]||[]).push(it.id);
+  });
+}
+try {
+  var _pr = localStorage.getItem(PACKKEY);
+  if (_pr) packInstall(JSON.parse(_pr));
+} catch(e){ PACK=null; }
+
+/* ───────── 세트 공통 인터페이스 ─────────
+   Both sets answer the same questions, so pool / pull / dex code is written
+   once. Pokemon weights by evolution stage; a pack is flat. */
+function SET(k){
+  if (k==="sr"){
+    if (!PACK) return null;
+    return { key:"sr", label:(PACK.name||"팩"), ids:SRIDS, pix:false,
+      grp:function(id){ return SRBY[id].slug; },
+      mem:function(g){ return SRG[g]; },
+      w:function(){ return 1; },
+      nm:function(id){ return SRBY[id].ko; },
+      im:function(id){ return SRBY[id].img; },
+      sub:function(){ return ""; } };
+  }
+  return { key:"pk", label:"포켓몬", ids:DIDS, pix:true,
+    grp:function(id){ return DEX[id].line; },
+    mem:function(g){ return LINES[g]; },
+    w:gw,
+    nm:function(id){ return DEX[id].ko; },
+    im:sprite,
+    sub:function(id){ var p=DEX[id];
+      return "No."+String(id).padStart(3,"0")+" · "+p.ty+" · "+p.stage+"단계"+(p.leg?" · 전설":""); } };
+}
+
+function G(){
+  var g=S.gacha;
+  if (!g) g = S.gacha = {usedMins:0, set:"pk",
+                         pk:{dex:{},hold:{},last:null}, sr:{dex:{},hold:{},last:null}};
+  if (g.dex || g.hold){                    /* carry over the single-set shape */
+    g.pk={dex:g.dex||{}, hold:g.hold||{}, last:g.last||null};
+    delete g.dex; delete g.hold; delete g.last;
+  }
+  if (g.usedMins===undefined){ g.usedMins = (g.used||0) * 20; delete g.used; }
+  if (!g.pk) g.pk={dex:{},hold:{},last:null};
+  if (!g.sr) g.sr={dex:{},hold:{},last:null};
+  if (g.set!=="sr" && g.set!=="pk") g.set="pk";
+  return g;
+}
+/* keep whatever the user picked, even with no pack installed — otherwise the
+   set silently snaps back to Pokemon and the "load a pack" screen is
+   unreachable. Every caller already handles SET() returning null. */
+function curKey(){ var g=G(); return g.set==="sr" ? "sr" : "pk"; }
+function gsub(k){ return G()[k||curKey()]; }
+
+/* a group leaves the pool once every member is REGISTERED — registration is
+   permanent, so merging away your copies can never re-open a finished group */
+function grpDone(D,k,g){
+  var m=D.mem(g), dx=gsub(k).dex;
+  for (var i=0;i<m.length;i++) if (!dx[m[i]]) return false;
+  return true;
+}
+function poolOf(D,k){
+  var out=[], memo={};
+  for (var i=0;i<D.ids.length;i++){
+    var id=D.ids[i], g=D.grp(id);
+    if (memo[g]===undefined) memo[g]=grpDone(D,k,g);
+    if (!memo[g]) out.push(id);
+  }
+  return out;
+}
+function dexCountOf(k){ var n=0, dx=gsub(k).dex; for (var i in dx) if (dx[i]) n++; return n; }
+
+function studyMins(){
+  var s=0;
+  for (var d in S.time) for (var id in S.time[d]) s += S.time[d][id];
+  return s;
+}
+/* the balance is allowed to go negative: deleting a study record takes back
+   the pulls it paid for, and the board says so plainly instead of hiding it.
+   It is a balance, not a punishment — shown in muted ink, never in alarm red. */
+function balMins(){ return studyMins() - (G().usedMins||0); }
+function costOf(k){ return COST[k] || COST.pk; }
+function ticketsLeft(k){ return Math.floor(balMins()/costOf(k||curKey())); }
+
+function doPull(){
+  var k=curKey(), D=SET(k);
+  if (!D || balMins() < costOf(k)) return null;
+  var p=poolOf(D,k); if (!p.length) return null;
+  var tot=0, i;
+  for (i=0;i<p.length;i++) tot += D.w(p[i]);
+  var r=Math.random()*tot;
+  for (i=0;i<p.length;i++){ r -= D.w(p[i]); if (r<=0) break; }
+  var id=p[Math.min(i,p.length-1)], g=G(), st=g[k];
+  g.usedMins=(g.usedMins||0)+costOf(k);
+  st.hold[id]=(st.hold[id]||0)+1;
+  var neu=!st.dex[id];
+  st.dex[id]=1;
+  st.last={id:id, neu:neu};
+  return st.last;
+}
+/* merging exists only where there is something to evolve into */
+function canMerge(id){
+  return curKey()==="pk" && DEX[id].to.length>0 && (gsub("pk").hold[id]||0)>=3;
+}
+function doMerge(id, to){
+  if (!canMerge(id) || DEX[id].to.indexOf(to)<0) return null;
+  var st=gsub("pk");
+  st.hold[id]-=3;
+  if (!st.hold[id]) delete st.hold[id];
+  st.hold[to]=(st.hold[to]||0)+1;
+  var neu=!st.dex[to];
+  st.dex[to]=1;
+  st.last={id:to, neu:neu};
+  return st.last;
+}
+function mergeables(){ return curKey()==="pk" ? DIDS.filter(canMerge) : []; }
+
+var dexOpen=false, mergePick=null;
+
 /* ───────── date helpers (UTC-free, local calendar) ───────── */
 function iso(d){
   return d.getFullYear() + "-" +
@@ -619,6 +1077,7 @@ function weekNo(ws){
   return 33 + Math.round(diff / 604800000);
 }
 function weekKey(ws){ return ws.getFullYear() + "-W" + weekNo(ws); }
+function monthKey(d){ return d.getFullYear() + "-" + String(d.getMonth()+1).padStart(2,"0"); }
 function md(d){ return (d.getMonth()+1) + "/" + d.getDate(); }
 
 /* ───────── state ───────── */
@@ -641,7 +1100,9 @@ function blank(){
                {pct:100,text:"",claimed:false} ],
     reports: [],
     seenWeek: null,
-    lastBackup: null
+    lastBackup: null,
+    backupAsked: null,          /* "YYYY-MM" — 이 달의 백업 물음에 이미 답했다 */
+    gacha: { used:0, dex:{}, hold:{}, last:null }
   };
 }
 
@@ -688,6 +1149,9 @@ function load(){
       if (!Object.keys(store[d]).length) delete store[d];
     }
   });
+  /* seed on first run so the question starts at the next month boundary
+     rather than firing the moment this version lands mid-month */
+  if (!S.backupAsked) S.backupAsked = monthKey(today());
   return S;
 }
 
@@ -883,11 +1347,11 @@ function render(){
   document.querySelectorAll(".tabs button").forEach(function(b){
     b.setAttribute("aria-selected", b.dataset.v === view ? "true" : "false");
   });
-  var v = el("view");
-  if (view === "cond") v.innerHTML = viewCond(cursorDay());
-  if (view === "day")  v.innerHTML = viewDay(cursorDay());
-  if (view === "week") v.innerHTML = viewWeek(cursorWeek());
-  if (view === "all")  v.innerHTML = viewAll();
+  var v = el("view"), top = backupDue() ? backupBanner() : "";
+  if (view === "cond") v.innerHTML = top + viewCond(cursorDay());
+  if (view === "day")  v.innerHTML = top + viewDay(cursorDay());
+  if (view === "week") v.innerHTML = top + viewWeek(cursorWeek());
+  if (view === "all")  v.innerHTML = top + viewAll();
   wire();
 }
 
@@ -1802,6 +2266,101 @@ function viewWeek(ws){
 }
 
 /* ── 전체 ── */
+function gachaCard(){
+  var g=G(), k=curKey(), D=SET(k);
+  var left=0;
+  var h='<div class="card"><h2>뽑기</h2>';
+
+  h+='<div class="seg gset">'
+   + '<button data-act="setpk" aria-pressed="'+(k==="pk")+'">포켓몬</button>'
+   + '<button data-act="setsr" aria-pressed="'+(k==="sr")+'">'+(PACK?esc(PACK.name||"팩"):"산리오")+'</button>'
+   + '</div>';
+
+  if (!D){
+    h+='<div class="empty">이 세트는 그림이 앱에 들어있지 않아.<br>'
+     + '<b>팩 파일(.json)</b>을 불러오면 여기서 뽑을 수 있어.<br>'
+     + '<span style="font-size:11.5px">아래 버튼 → 파일 앱에서 <b>octopus-pack-sanrio.json</b> 선택</span></div>'
+     + '<div class="gline"><button class="pull" data-act="packimp">팩 불러오기</button></div>'
+     + '<input type="file" id="packfile" accept="application/json,.json" style="display:none">'
+     + '</div>';
+    return h;
+  }
+
+  var got=dexCountOf(k), tot=D.ids.length, pool=poolOf(D,k), empty=(pool.length===0);
+  left=ticketsLeft(k);
+  h+='<div class="readout greadout"><div class="big'+(left<0?' owe':'')+'">'+left+'<em>장</em></div>'
+   + '<div class="side">'+esc(D.label)+' <span class="rate">('+costOf(k)+'분에 1장)</span>'
+   + '<br><b>'+got+'</b> / '+tot+'</div></div>';
+  h+='<div class="rail"><i style="width:'+(tot?Math.round(got/tot*100):0)+'%"></i></div>';
+
+  h+='<div class="gline">'
+   + '<button class="pull" data-act="pull"'+((left<1||empty)?' disabled':'')+'>'
+   +   (empty?'다 모았어':'뽑기')+'</button>'
+   + '<button class="dexbtn" data-act="dextoggle">'+(dexOpen?'닫기':'도감')+'</button>'
+   + '</div>';
+
+  if (left<1 && !empty)
+    h+='<div class="studyhint" style="text-align:left">완료한 퀘스트에 <b>+시간</b>을 붙이면 뽑기권이 쌓여. '
+     + costOf(k)+'분에 1장.</div>';
+
+  var st=gsub(k);
+  if (st.last && D.ids.indexOf(st.last.id)>=0){
+    var id=st.last.id, n=st.hold[id]||0, sb=D.sub(id);
+    h+='<div class="gres">'
+     + '<img class="'+(D.pix?"pix":"")+'" src="'+D.im(id)+'" alt="" loading="lazy" onerror="this.style.display=\'none\'">'
+     + '<div><div class="nm">'+esc(D.nm(id))
+     +   (st.last.neu?'<span class="gnew">NEW</span>':'<span class="gdup">중복</span>')+'</div>'
+     + '<div class="mt">'+(sb?esc(sb)+' · ':'')+'보유 '+n+'</div></div></div>';
+  }
+
+  var mg=mergeables();
+  if (mg.length){
+    h+='<div style="margin-top:13px"><h2 style="margin:0 0 2px">합성</h2>'
+     + '<div class="studyhint" style="text-align:left;margin:0">같은 포켓몬 3마리 → 다음 단계 1마리</div>';
+    mg.forEach(function(id){
+      var p=DEX[id];
+      h+='<div class="mrow"><img class="pix" src="'+sprite(id)+'" alt="" loading="lazy" onerror="this.style.display=\'none\'">'
+       + '<div class="nm">'+esc(p.ko)+' <span style="color:var(--ink-3);font-weight:400">보유 '+(gsub("pk").hold[id]||0)+'</span></div>'
+       + (mergePick===id ? '' : '<button data-act="mergeopen" data-id="'+id+'">진화</button>')
+       + '</div>';
+      if (mergePick===id){
+        h+='<div class="mpick">';
+        p.to.forEach(function(t){
+          h+='<button data-act="mergego" data-id="'+id+'" data-to="'+t+'">'
+           + '<img class="pix" src="'+sprite(t)+'" alt="" loading="lazy" onerror="this.style.display=\'none\'">'
+           + esc(DEX[t].ko)+'</button>';
+        });
+        h+='<button data-act="mergecancel">취소</button></div>';
+      }
+    });
+    h+='</div>';
+  }
+
+  if (dexOpen){
+    h+='<div class="dexgrid">';
+    D.ids.forEach(function(id){
+      var seen=!!st.dex[id], n=st.hold[id]||0;
+      var leg=(k==="pk" && DEX[id].leg && seen);
+      h+='<div class="dexcell'+(seen?'':' miss')+(leg?' leg':'')+'" '
+       + 'title="'+(seen?esc(D.nm(id)):"?")+'">'
+       + '<img class="'+(D.pix?"pix":"")+'" src="'+D.im(id)+'" alt="" loading="lazy" onerror="this.style.opacity=0">'
+       + (n>1?'<span class="cnt">×'+n+'</span>':'')+'</div>';
+    });
+    h+='</div>';
+  }
+
+  if (k==="sr"){
+    h+='<div class="gline" style="margin-top:12px">'
+     + '<button class="dexbtn" style="flex:1" data-act="packexp">팩 내보내기</button>'
+     + '<button class="dexbtn" style="flex:1" data-act="packimp">팩 바꾸기</button></div>'
+     + '<div class="studyhint" style="text-align:left">팩은 그림만 담겨. 이 기기에만 저장되고 백업 파일과는 별개야.</div>'
+     + '<input type="file" id="packfile" accept="application/json,.json" style="display:none">';
+  }
+
+  h+='</div>';
+  return h;
+}
+
 function viewAll(){
   var once = S.tasks.filter(function(t){ return t.repeat === "once"; });
   var rout = S.tasks.filter(function(t){ return t.repeat === "weekly"; });
@@ -1812,7 +2371,8 @@ function viewAll(){
   var gotP = doneOnce.reduce(function(a,t){ return a+PTS[t.tier]; },0);
   var pct  = totP ? Math.round(gotP/totP*100) : 0;
 
-  var h = '<div class="card"><h2>한 번짜리</h2>';
+  var h = gachaCard();
+  h += '<div class="card"><h2>한 번짜리</h2>';
   if (!once.length){
     h += '<div class="empty">아직 없어. 아래에서 추가해봐.</div>';
   } else {
@@ -2122,6 +2682,30 @@ var editingCond = false, cdraftDate = null;
 var timingId = null;
 var cdraft = { sleep:"", wake:"", score:0 };
 
+function exportBoard(){
+  var stamp = iso(today());
+  var blob = new Blob([JSON.stringify(S, null, 2)], {type:"application/json"});
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement("a");
+  a.href = url; a.download = BKNAME + stamp + ".json";
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  setTimeout(function(){ URL.revokeObjectURL(url); }, 4000);
+  S.lastBackup = Date.now(); save();
+}
+
+/* Asked once when a new month is first opened — not only on the 1st, so it
+   still comes around for someone who did not open the app that day. */
+function backupDue(){ return S.backupAsked !== monthKey(today()); }
+function backupBanner(){
+  var d=today();
+  return '<div class="warn bkask">'
+    + '<b>'+(d.getMonth()+1)+'월이 시작됐어.</b> 지금까지 기록을 백업 파일로 저장해둘까?'
+    + '<div class="bkrow">'
+    +   '<button class="pull" data-act="bkyes">저장할게</button>'
+    +   '<button class="dexbtn" data-act="bkno">안 할래</button>'
+    + '</div></div>';
+}
+
 function toast(msg){
   var t = el("toast");
   t.textContent = msg; t.classList.add("up");
@@ -2240,6 +2824,29 @@ function wire(){
     });
   }
 
+  var pf = el("packfile");
+  if (pf){
+    pf.addEventListener("change", function(){
+      var file = pf.files && pf.files[0];
+      if (!file) return;
+      var fr = new FileReader();
+      fr.onload = function(){
+        var p;
+        try { p = JSON.parse(fr.result); }
+        catch(e){ toast("이 파일은 못 읽겠어"); pf.value=""; return; }
+        if (!p || p.type!=="octopus-pack" || !p.items || !p.items.length){
+          toast("옥토퍼스 팩 파일이 아닌 것 같아"); pf.value=""; return;
+        }
+        try { localStorage.setItem(PACKKEY, JSON.stringify(p)); }
+        catch(e){ toast("저장 공간이 모자라. 팩이 너무 커."); pf.value=""; return; }
+        packInstall(p);
+        G().set="sr"; save(); pf.value=""; render();
+        toast((p.name||"팩")+" 불러왔어 · "+p.items.length+"종");
+      };
+      fr.readAsText(file);
+    });
+  }
+
   var imp = el("impfile");
   if (imp){
     imp.addEventListener("change", function(){
@@ -2284,6 +2891,52 @@ function wire(){
 }
 
 function doAct(act, n){
+  if (act === "pull"){
+    var r=doPull();
+    if (!r){
+      var D0=SET(curKey());
+      toast(!D0 ? "팩을 먼저 불러와줘"
+            : (poolOf(D0,curKey()).length ? "뽑기권이 없어 · "+costOf(curKey())+"분에 1장" : "다 모았어"));
+      return;
+    }
+    mergePick=null; save(); render();
+    var nm=SET(curKey()).nm(r.id);
+    toast(r.neu ? nm+" 획득!" : nm+" (중복)");
+    return;
+  }
+  if (act === "setpk"){ G().set="pk"; mergePick=null; save(); render(); return; }
+  if (act === "setsr"){ G().set="sr"; mergePick=null; save(); render(); return; }
+  if (act === "packimp"){ var pf=el("packfile"); if (pf) pf.click(); return; }
+  if (act === "packexp"){
+    if (!PACK){ toast("내보낼 팩이 없어"); return; }
+    try {
+      var blob=new Blob([JSON.stringify(PACK)], {type:"application/json"});
+      var url=URL.createObjectURL(blob), a=document.createElement("a");
+      a.href=url; a.download="octopus-pack-"+(PACK.set||"set")+".json";
+      document.body.appendChild(a); a.click(); document.body.removeChild(a);
+      setTimeout(function(){ URL.revokeObjectURL(url); }, 3000);
+      toast("팩 파일을 저장했어");
+    } catch(e){ toast("내보내기가 안 됐어"); }
+    return;
+  }
+  if (act === "dextoggle"){ dexOpen=!dexOpen; render(); return; }
+  if (act === "mergeopen"){
+    var mid=+n.dataset.id;
+    if (DEX[mid].to.length===1){
+      var r2=doMerge(mid, DEX[mid].to[0]);
+      if (r2){ save(); render(); toast(DEX[r2.id].ko+"(으)로 진화!"); }
+      return;
+    }
+    mergePick=mid; render(); return;
+  }
+  if (act === "mergego"){
+    var r3=doMerge(+n.dataset.id, +n.dataset.to);
+    mergePick=null;
+    if (r3){ save(); render(); toast(DEX[r3.id].ko+"(으)로 진화!"); }
+    return;
+  }
+  if (act === "mergecancel"){ mergePick=null; render(); return; }
+
   if (act === "toggle"){
     var id = n.dataset.id, ds = n.dataset.d;
     var ws = weekStart(today());
@@ -2416,15 +3069,18 @@ function doAct(act, n){
   if (act === "nextweek"){ if (weekOffset <   52){ weekOffset++; render(); } return; }
   if (act === "jumpweek"){ weekOffset = 0; render(); return; }
   if (act === "expjson"){
-    var stamp = iso(today());
-    var blob = new Blob([JSON.stringify(S, null, 2)], {type:"application/json"});
-    var url = URL.createObjectURL(blob);
-    var a = document.createElement("a");
-    a.href = url; a.download = BKNAME + stamp + ".json";
-    document.body.appendChild(a); a.click(); document.body.removeChild(a);
-    setTimeout(function(){ URL.revokeObjectURL(url); }, 4000);
-    S.lastBackup = Date.now(); save(); render2("settings");
+    exportBoard(); render2("settings");
     toast("백업 파일 저장했어 🐙");
+    return;
+  }
+  if (act === "bkyes"){
+    exportBoard();
+    S.backupAsked = monthKey(today()); save(); render();
+    toast("백업 파일 저장했어 🐙");
+    return;
+  }
+  if (act === "bkno"){
+    S.backupAsked = monthKey(today()); save(); render();
     return;
   }
   if (act === "impjson"){ var f = el("impfile"); if (f) f.click(); return; }
