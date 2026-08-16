@@ -556,6 +556,41 @@ button,.row,.chip,.tabs button,.condpick button,.seg button,.dowpick button{
 .warn{background:var(--accent-soft);border:1px solid var(--accent);color:var(--accent-ink);
   padding:11px 13px;border-radius:9px;font-size:12.5px;line-height:1.6;margin-bottom:14px}
 .hide{display:none !important}
+.gline{display:flex;gap:9px;align-items:center;margin:11px 0 3px}
+.gline .pull{flex:1;padding:13px;border-radius:10px;border:0;font:inherit;font-weight:700;
+  font-size:14px;background:var(--accent);color:#fff;cursor:pointer}
+.gline .pull[disabled]{background:var(--sunk);color:var(--ink-3);cursor:default}
+.gline .dexbtn{padding:13px 15px;border-radius:10px;border:1px solid var(--line);
+  background:var(--surface);color:var(--ink-2);font:inherit;font-size:13px;cursor:pointer}
+.gres{display:flex;gap:13px;align-items:center;margin-top:12px;padding:12px;
+  border-radius:11px;background:var(--surface-2);border:1px solid var(--line-soft)}
+.gres img{width:74px;height:74px;image-rendering:pixelated;flex:none}
+.gres .nm{font-size:16px;font-weight:700;line-height:1.35}
+.gres .mt{font-size:11.5px;color:var(--ink-3);margin-top:3px}
+.gnew{display:inline-block;margin-left:6px;padding:1px 6px;border-radius:5px;
+  background:var(--good-soft);color:var(--good);font-size:10px;font-weight:700;letter-spacing:.06em}
+.gdup{display:inline-block;margin-left:6px;padding:1px 6px;border-radius:5px;
+  background:var(--sunk);color:var(--ink-3);font-size:10px;font-weight:700}
+.dexgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(52px,1fr));
+  gap:5px;margin-top:11px}
+.dexcell{position:relative;aspect-ratio:1;border-radius:8px;background:var(--surface-2);
+  border:1px solid var(--line-soft);display:flex;align-items:center;justify-content:center}
+.dexcell img{width:100%;height:100%;image-rendering:pixelated}
+.dexcell.miss img{filter:brightness(0);opacity:.17}
+.dexcell .cnt{position:absolute;right:2px;bottom:1px;font-size:9.5px;font-weight:700;
+  color:var(--ink-3)}
+.dexcell.leg{border-color:var(--accent);background:var(--accent-soft)}
+.mrow{display:flex;gap:8px;align-items:center;padding:8px 10px;border-radius:9px;
+  background:var(--surface-2);border:1px solid var(--line-soft);margin-top:7px}
+.mrow img{width:38px;height:38px;image-rendering:pixelated;flex:none}
+.mrow .nm{flex:1;font-size:13px;font-weight:600}
+.mrow button{padding:7px 11px;border-radius:8px;border:0;background:var(--accent);
+  color:#fff;font:inherit;font-size:12px;font-weight:700;cursor:pointer}
+.mpick{display:flex;flex-wrap:wrap;gap:6px;margin-top:7px}
+.mpick button{display:flex;flex-direction:column;align-items:center;gap:2px;
+  padding:7px 9px;border-radius:9px;border:1px solid var(--line);
+  background:var(--surface);color:var(--ink);font:inherit;font-size:11px;cursor:pointer}
+.mpick img{width:40px;height:40px;image-rendering:pixelated}
 .betabadge{display:inline-block;vertical-align:middle;margin-left:7px;
   padding:2px 7px;border-radius:6px;border:1px solid var(--accent);
   background:var(--accent-soft);color:var(--accent-ink);
@@ -604,6 +639,349 @@ if (IS_BETA){
   if (_bb) _bb.classList.remove("hide");
 }
 
+/* ───────── 뽑기 · 포켓몬 도감 (1·2세대) ─────────
+   Tickets come from measured study minutes, but never from sitting still:
+   minutes can only be attached to a quest that was completed, so a ticket
+   always stands behind a finished thing. Deliberately kept out of the pt
+   tracks — this is a collection, not a score. */
+var DEXR=[
+[1,"이상해씨","풀/독",1,1,"2",0],
+[2,"이상해풀","풀/독",2,1,"3",0],
+[3,"이상해꽃","풀/독",3,1,"",0],
+[4,"파이리","불꽃",1,2,"5",0],
+[5,"리자드","불꽃",2,2,"6",0],
+[6,"리자몽","불꽃/비행",3,2,"",0],
+[7,"꼬부기","물",1,3,"8",0],
+[8,"어니부기","물",2,3,"9",0],
+[9,"거북왕","물",3,3,"",0],
+[10,"캐터피","벌레",1,4,"11",0],
+[11,"단데기","벌레",2,4,"12",0],
+[12,"버터플","벌레/비행",3,4,"",0],
+[13,"뿔충이","벌레/독",1,5,"14",0],
+[14,"딱충이","벌레/독",2,5,"15",0],
+[15,"독침붕","벌레/독",3,5,"",0],
+[16,"구구","노말/비행",1,6,"17",0],
+[17,"피죤","노말/비행",2,6,"18",0],
+[18,"피죤투","노말/비행",3,6,"",0],
+[19,"꼬렛","노말",1,7,"20",0],
+[20,"레트라","노말",2,7,"",0],
+[21,"깨비참","노말/비행",1,8,"22",0],
+[22,"깨비드릴조","노말/비행",2,8,"",0],
+[23,"아보","독",1,9,"24",0],
+[24,"아보크","독",2,9,"",0],
+[25,"피카츄","전기",2,10,"26",0],
+[26,"라이츄","전기",3,10,"",0],
+[27,"모래두지","땅",1,11,"28",0],
+[28,"고지","땅",2,11,"",0],
+[29,"니드런♀","독",1,12,"30",0],
+[30,"니드리나","독",2,12,"31",0],
+[31,"니드퀸","독/땅",3,12,"",0],
+[32,"니드런♂","독",1,13,"33",0],
+[33,"니드리노","독",2,13,"34",0],
+[34,"니드킹","독/땅",3,13,"",0],
+[35,"삐삐","페어리",2,14,"36",0],
+[36,"픽시","페어리",3,14,"",0],
+[37,"식스테일","불꽃",1,15,"38",0],
+[38,"나인테일","불꽃",2,15,"",0],
+[39,"푸린","노말/페어리",2,16,"40",0],
+[40,"푸크린","노말/페어리",3,16,"",0],
+[41,"주뱃","독/비행",1,17,"42",0],
+[42,"골뱃","독/비행",2,17,"169",0],
+[43,"뚜벅쵸","풀/독",1,18,"44",0],
+[44,"냄새꼬","풀/독",2,18,"45,182",0],
+[45,"라플레시아","풀/독",3,18,"",0],
+[46,"파라스","벌레/풀",1,19,"47",0],
+[47,"파라섹트","벌레/풀",2,19,"",0],
+[48,"콘팡","벌레/독",1,20,"49",0],
+[49,"도나리","벌레/독",2,20,"",0],
+[50,"디그다","땅",1,21,"51",0],
+[51,"닥트리오","땅",2,21,"",0],
+[52,"나옹","노말",1,22,"53",0],
+[53,"페르시온","노말",2,22,"",0],
+[54,"고라파덕","물",1,23,"55",0],
+[55,"골덕","물",2,23,"",0],
+[56,"망키","격투",1,24,"57",0],
+[57,"성원숭","격투",2,24,"",0],
+[58,"가디","불꽃",1,25,"59",0],
+[59,"윈디","불꽃",2,25,"",0],
+[60,"발챙이","물",1,26,"61",0],
+[61,"슈륙챙이","물",2,26,"62,186",0],
+[62,"강챙이","물/격투",3,26,"",0],
+[63,"캐이시","에스퍼",1,27,"64",0],
+[64,"윤겔라","에스퍼",2,27,"65",0],
+[65,"후딘","에스퍼",3,27,"",0],
+[66,"알통몬","격투",1,28,"67",0],
+[67,"근육몬","격투",2,28,"68",0],
+[68,"괴력몬","격투",3,28,"",0],
+[69,"모다피","풀/독",1,29,"70",0],
+[70,"우츠동","풀/독",2,29,"71",0],
+[71,"우츠보트","풀/독",3,29,"",0],
+[72,"왕눈해","물/독",1,30,"73",0],
+[73,"독파리","물/독",2,30,"",0],
+[74,"꼬마돌","바위/땅",1,31,"75",0],
+[75,"데구리","바위/땅",2,31,"76",0],
+[76,"딱구리","바위/땅",3,31,"",0],
+[77,"포니타","불꽃",1,32,"78",0],
+[78,"날쌩마","불꽃",2,32,"",0],
+[79,"야돈","물/에스퍼",1,33,"80,199",0],
+[80,"야도란","물/에스퍼",2,33,"",0],
+[81,"코일","전기/강철",1,34,"82",0],
+[82,"레어코일","전기/강철",2,34,"",0],
+[83,"파오리","노말/비행",1,35,"",0],
+[84,"두두","노말/비행",1,36,"85",0],
+[85,"두트리오","노말/비행",2,36,"",0],
+[86,"쥬쥬","물",1,37,"87",0],
+[87,"쥬레곤","물/얼음",2,37,"",0],
+[88,"질퍽이","독",1,38,"89",0],
+[89,"질뻐기","독",2,38,"",0],
+[90,"셀러","물",1,39,"91",0],
+[91,"파르셀","물/얼음",2,39,"",0],
+[92,"고오스","고스트/독",1,40,"93",0],
+[93,"고우스트","고스트/독",2,40,"94",0],
+[94,"팬텀","고스트/독",3,40,"",0],
+[95,"롱스톤","바위/땅",1,41,"208",0],
+[96,"슬리프","에스퍼",1,42,"97",0],
+[97,"슬리퍼","에스퍼",2,42,"",0],
+[98,"크랩","물",1,43,"99",0],
+[99,"킹크랩","물",2,43,"",0],
+[100,"찌리리공","전기",1,44,"101",0],
+[101,"붐볼","전기",2,44,"",0],
+[102,"아라리","풀/에스퍼",1,45,"103",0],
+[103,"나시","풀/에스퍼",2,45,"",0],
+[104,"탕구리","땅",1,46,"105",0],
+[105,"텅구리","땅",2,46,"",0],
+[106,"시라소몬","격투",2,47,"",0],
+[107,"홍수몬","격투",2,47,"",0],
+[108,"내루미","노말",1,48,"",0],
+[109,"또가스","독",1,49,"110",0],
+[110,"또도가스","독",2,49,"",0],
+[111,"뿔카노","땅/바위",1,50,"112",0],
+[112,"코뿌리","땅/바위",2,50,"",0],
+[113,"럭키","노말",1,51,"242",0],
+[114,"덩쿠리","풀",1,52,"",0],
+[115,"캥카","노말",1,53,"",0],
+[116,"쏘드라","물",1,54,"117",0],
+[117,"시드라","물",2,54,"230",0],
+[118,"콘치","물",1,55,"119",0],
+[119,"왕콘치","물",2,55,"",0],
+[120,"별가사리","물",1,56,"121",0],
+[121,"아쿠스타","물/에스퍼",2,56,"",0],
+[122,"마임맨","에스퍼/페어리",1,57,"",0],
+[123,"스라크","벌레/비행",1,58,"212",0],
+[124,"루주라","얼음/에스퍼",2,59,"",0],
+[125,"에레브","전기",2,60,"",0],
+[126,"마그마","불꽃",2,61,"",0],
+[127,"쁘사이저","벌레",1,62,"",0],
+[128,"켄타로스","노말",1,63,"",0],
+[129,"잉어킹","물",1,64,"130",0],
+[130,"갸라도스","물/비행",2,64,"",0],
+[131,"라프라스","물/얼음",1,65,"",0],
+[132,"메타몽","노말",1,66,"",0],
+[133,"이브이","노말",1,67,"134,135,136,196,197",0],
+[134,"샤미드","물",2,67,"",0],
+[135,"쥬피썬더","전기",2,67,"",0],
+[136,"부스터","불꽃",2,67,"",0],
+[137,"폴리곤","노말",1,68,"233",0],
+[138,"암나이트","바위/물",1,69,"139",0],
+[139,"암스타","바위/물",2,69,"",0],
+[140,"투구","바위/물",1,70,"141",0],
+[141,"투구푸스","바위/물",2,70,"",0],
+[142,"프테라","바위/비행",1,71,"",0],
+[143,"잠만보","노말",1,72,"",0],
+[144,"프리져","얼음/비행",1,73,"",1],
+[145,"썬더","전기/비행",1,74,"",1],
+[146,"파이어","불꽃/비행",1,75,"",1],
+[147,"미뇽","드래곤",1,76,"148",0],
+[148,"신뇽","드래곤",2,76,"149",0],
+[149,"망나뇽","드래곤/비행",3,76,"",0],
+[150,"뮤츠","에스퍼",1,77,"",1],
+[151,"뮤","에스퍼",1,78,"",1],
+[152,"치코리타","풀",1,79,"153",0],
+[153,"베이리프","풀",2,79,"154",0],
+[154,"메가니움","풀",3,79,"",0],
+[155,"브케인","불꽃",1,80,"156",0],
+[156,"마그케인","불꽃",2,80,"157",0],
+[157,"블레이범","불꽃",3,80,"",0],
+[158,"리아코","물",1,81,"159",0],
+[159,"엘리게이","물",2,81,"160",0],
+[160,"장크로다일","물",3,81,"",0],
+[161,"꼬리선","노말",1,82,"162",0],
+[162,"다꼬리","노말",2,82,"",0],
+[163,"부우부","노말/비행",1,83,"164",0],
+[164,"야부엉","노말/비행",2,83,"",0],
+[165,"레디바","벌레/비행",1,84,"166",0],
+[166,"레디안","벌레/비행",2,84,"",0],
+[167,"페이검","벌레/독",1,85,"168",0],
+[168,"아리아도스","벌레/독",2,85,"",0],
+[169,"크로뱃","독/비행",3,17,"",0],
+[170,"초라기","물/전기",1,86,"171",0],
+[171,"랜턴","물/전기",2,86,"",0],
+[172,"피츄","전기",1,10,"25",0],
+[173,"삐","페어리",1,14,"35",0],
+[174,"푸푸린","노말/페어리",1,16,"39",0],
+[175,"토게피","페어리",1,87,"176",0],
+[176,"토게틱","페어리/비행",2,87,"",0],
+[177,"네이티","에스퍼/비행",1,88,"178",0],
+[178,"네이티오","에스퍼/비행",2,88,"",0],
+[179,"메리프","전기",1,89,"180",0],
+[180,"보송송","전기",2,89,"181",0],
+[181,"전룡","전기",3,89,"",0],
+[182,"아르코","풀",3,18,"",0],
+[183,"마릴","물/페어리",1,90,"184",0],
+[184,"마릴리","물/페어리",2,90,"",0],
+[185,"꼬지모","바위",1,91,"",0],
+[186,"왕구리","물",3,26,"",0],
+[187,"통통코","풀/비행",1,92,"188",0],
+[188,"두코","풀/비행",2,92,"189",0],
+[189,"솜솜코","풀/비행",3,92,"",0],
+[190,"에이팜","노말",1,93,"",0],
+[191,"해너츠","풀",1,94,"192",0],
+[192,"해루미","풀",2,94,"",0],
+[193,"왕자리","벌레/비행",1,95,"",0],
+[194,"우파","물/땅",1,96,"195",0],
+[195,"누오","물/땅",2,96,"",0],
+[196,"에브이","에스퍼",2,67,"",0],
+[197,"블래키","악",2,67,"",0],
+[198,"니로우","악/비행",1,97,"",0],
+[199,"야도킹","물/에스퍼",2,33,"",0],
+[200,"무우마","고스트",1,98,"",0],
+[201,"안농","에스퍼",1,99,"",0],
+[202,"마자용","에스퍼",1,100,"",0],
+[203,"키링키","노말/에스퍼",1,101,"",0],
+[204,"피콘","벌레",1,102,"205",0],
+[205,"쏘콘","벌레/강철",2,102,"",0],
+[206,"노고치","노말",1,103,"",0],
+[207,"글라이거","땅/비행",1,104,"",0],
+[208,"강철톤","강철/땅",2,41,"",0],
+[209,"블루","페어리",1,105,"210",0],
+[210,"그랑블루","페어리",2,105,"",0],
+[211,"침바루","물/독",1,106,"",0],
+[212,"핫삼","벌레/강철",2,58,"",0],
+[213,"단단지","벌레/바위",1,107,"",0],
+[214,"헤라크로스","벌레/격투",1,108,"",0],
+[215,"포푸니","악/얼음",1,109,"",0],
+[216,"깜지곰","노말",1,110,"217",0],
+[217,"링곰","노말",2,110,"",0],
+[218,"마그마그","불꽃",1,111,"219",0],
+[219,"마그카르고","불꽃/바위",2,111,"",0],
+[220,"꾸꾸리","얼음/땅",1,112,"221",0],
+[221,"메꾸리","얼음/땅",2,112,"",0],
+[222,"코산호","물/바위",1,113,"",0],
+[223,"총어","물",1,114,"224",0],
+[224,"대포무노","물",2,114,"",0],
+[225,"딜리버드","얼음/비행",1,115,"",0],
+[226,"만타인","물/비행",1,116,"",0],
+[227,"무장조","강철/비행",1,117,"",0],
+[228,"델빌","악/불꽃",1,118,"229",0],
+[229,"헬가","악/불꽃",2,118,"",0],
+[230,"킹드라","물/드래곤",3,54,"",0],
+[231,"코코리","땅",1,119,"232",0],
+[232,"코리갑","땅",2,119,"",0],
+[233,"폴리곤2","노말",2,68,"",0],
+[234,"노라키","노말",1,120,"",0],
+[235,"루브도","노말",1,121,"",0],
+[236,"배루키","격투",1,47,"106,107,237",0],
+[237,"카포에라","격투",2,47,"",0],
+[238,"뽀뽀라","얼음/에스퍼",1,59,"124",0],
+[239,"에레키드","전기",1,60,"125",0],
+[240,"마그비","불꽃",1,61,"126",0],
+[241,"밀탱크","노말",1,122,"",0],
+[242,"해피너스","노말",2,51,"",0],
+[243,"라이코","전기",1,123,"",1],
+[244,"앤테이","불꽃",1,124,"",1],
+[245,"스이쿤","물",1,125,"",1],
+[246,"애버라스","바위/땅",1,126,"247",0],
+[247,"데기라스","바위/땅",2,126,"248",0],
+[248,"마기라스","바위/악",3,126,"",0],
+[249,"루기아","에스퍼/비행",1,127,"",1],
+[250,"칠색조","불꽃/비행",1,128,"",1],
+[251,"세레비","에스퍼/풀",1,129,"",1]
+];
+
+var DEX={}, LINES={}, DIDS=[];
+DEXR.forEach(function(r){
+  DEX[r[0]]={id:r[0],ko:r[1],ty:r[2],stage:r[3],line:r[4],
+             to:r[5]?String(r[5]).split(",").map(Number):[],leg:!!r[6]};
+  DIDS.push(r[0]);
+  (LINES[r[4]]=LINES[r[4]]||[]).push(r[0]);
+});
+
+var MIN_PER_TICKET = 10;
+var STW  = {1:9, 2:3, 3:1};   /* each evolution step is 3x rarer */
+var LEGRATE = 0.005;          /* legendary+mythical share of a full pool */
+var LEGW = (function(){
+  var wnl=0, nl=0;
+  DIDS.forEach(function(i){ if (DEX[i].leg) nl++; else wnl += STW[DEX[i].stage]; });
+  return (LEGRATE*wnl/(1-LEGRATE))/nl;
+})();
+function gw(i){ return DEX[i].leg ? LEGW : STW[DEX[i].stage]; }
+
+function G(){
+  if (!S.gacha) S.gacha = {used:0, dex:{}, hold:{}, last:null};
+  if (!S.gacha.dex)  S.gacha.dex  = {};
+  if (!S.gacha.hold) S.gacha.hold = {};
+  return S.gacha;
+}
+/* a line leaves the pool once every member is REGISTERED — registration is
+   permanent, so merging away your copies can never re-open a finished line */
+function lineDone(L){
+  var m=LINES[L], g=G();
+  for (var k=0;k<m.length;k++) if (!g.dex[m[k]]) return false;
+  return true;
+}
+function gPool(){
+  var out=[], memo={};
+  for (var k=0;k<DIDS.length;k++){
+    var L=DEX[DIDS[k]].line;
+    if (memo[L]===undefined) memo[L]=lineDone(L);
+    if (!memo[L]) out.push(DIDS[k]);
+  }
+  return out;
+}
+function studyMins(){
+  var s=0;
+  for (var d in S.time) for (var id in S.time[d]) s += S.time[d][id];
+  return s;
+}
+function ticketsAll(){  return Math.floor(studyMins()/MIN_PER_TICKET); }
+function ticketsLeft(){ return Math.max(0, ticketsAll() - (G().used||0)); }
+function dexCount(){ var n=0, g=G(); for (var i in g.dex) if (g.dex[i]) n++; return n; }
+
+function doPull(){
+  if (ticketsLeft() < 1) return null;
+  var p=gPool(); if (!p.length) return null;
+  var tot=0, i;
+  for (i=0;i<p.length;i++) tot += gw(p[i]);
+  var r=Math.random()*tot;
+  for (i=0;i<p.length;i++){ r -= gw(p[i]); if (r<=0) break; }
+  var id=p[Math.min(i,p.length-1)], g=G();
+  g.used=(g.used||0)+1;
+  g.hold[id]=(g.hold[id]||0)+1;
+  var neu=!g.dex[id];
+  g.dex[id]=1;
+  g.last={id:id, neu:neu, via:"pull"};
+  return g.last;
+}
+function canMerge(id){ return DEX[id].to.length>0 && (G().hold[id]||0)>=3; }
+function doMerge(id, to){
+  var g=G();
+  if (!canMerge(id) || DEX[id].to.indexOf(to)<0) return null;
+  g.hold[id]-=3;
+  if (!g.hold[id]) delete g.hold[id];
+  g.hold[to]=(g.hold[to]||0)+1;
+  var neu=!g.dex[to];
+  g.dex[to]=1;
+  g.last={id:to, neu:neu, via:"merge"};
+  return g.last;
+}
+function mergeables(){
+  return DIDS.filter(canMerge);
+}
+function sprite(id){
+  return "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/"+id+".png";
+}
+var dexOpen=false, mergePick=null;
+
 /* ───────── date helpers (UTC-free, local calendar) ───────── */
 function iso(d){
   return d.getFullYear() + "-" +
@@ -641,7 +1019,8 @@ function blank(){
                {pct:100,text:"",claimed:false} ],
     reports: [],
     seenWeek: null,
-    lastBackup: null
+    lastBackup: null,
+    gacha: { used:0, dex:{}, hold:{}, last:null }
   };
 }
 
@@ -1802,6 +2181,72 @@ function viewWeek(ws){
 }
 
 /* ── 전체 ── */
+function gachaCard(){
+  var g=G(), left=ticketsLeft(), got=dexCount(), tot=DIDS.length;
+  var h='<div class="card"><h2>뽑기</h2>';
+  h+='<div class="readout"><div class="big">'+left+'<em>장</em></div>'
+   + '<div class="side">공부 '+studyMins()+'분 · '+MIN_PER_TICKET+'분에 1장<br>'
+   + '도감 <b>'+got+'</b> / '+tot+'</div></div>';
+  h+='<div class="rail"><i style="width:'+(tot?Math.round(got/tot*100):0)+'%"></i></div>';
+
+  var empty=(gPool().length===0);
+  h+='<div class="gline">'
+   + '<button class="pull" data-act="pull"'+((left<1||empty)?' disabled':'')+'>'
+   +   (empty?'도감 완성':'뽑기')+'</button>'
+   + '<button class="dexbtn" data-act="dextoggle">'+(dexOpen?'도감 닫기':'도감')+'</button>'
+   + '</div>';
+
+  if (left<1 && !empty)
+    h+='<div class="studyhint" style="text-align:left">완료한 퀘스트에 <b>+시간</b>을 붙이면 뽑기권이 쌓여. 10분에 1장.</div>';
+
+  if (g.last && DEX[g.last.id]){
+    var p=DEX[g.last.id], n=g.hold[p.id]||0;
+    h+='<div class="gres">'
+     + '<img src="'+sprite(p.id)+'" alt="" loading="lazy" onerror="this.style.display=\'none\'">'
+     + '<div><div class="nm">'+esc(p.ko)
+     +   (g.last.neu?'<span class="gnew">NEW</span>':'<span class="gdup">중복</span>')+'</div>'
+     + '<div class="mt">No.'+String(p.id).padStart(3,"0")+' · '+esc(p.ty)
+     +   ' · '+p.stage+'단계'+(p.leg?' · 전설':'')+' · 보유 '+n+'</div></div></div>';
+  }
+
+  var mg=mergeables();
+  if (mg.length){
+    h+='<div style="margin-top:13px"><h2 style="margin:0 0 2px">합성</h2>'
+     + '<div class="studyhint" style="text-align:left;margin:0">같은 포켓몬 3마리 → 다음 단계 1마리</div>';
+    mg.forEach(function(id){
+      var p=DEX[id];
+      h+='<div class="mrow"><img src="'+sprite(id)+'" alt="" loading="lazy" onerror="this.style.display=\'none\'">'
+       + '<div class="nm">'+esc(p.ko)+' <span style="color:var(--ink-3);font-weight:400">보유 '+(G().hold[id]||0)+'</span></div>'
+       + (mergePick===id ? '' : '<button data-act="mergeopen" data-id="'+id+'">진화</button>')
+       + '</div>';
+      if (mergePick===id){
+        h+='<div class="mpick">';
+        p.to.forEach(function(t){
+          h+='<button data-act="mergego" data-id="'+id+'" data-to="'+t+'">'
+           + '<img src="'+sprite(t)+'" alt="" loading="lazy" onerror="this.style.display=\'none\'">'
+           + esc(DEX[t].ko)+'</button>';
+        });
+        h+='<button data-act="mergecancel">취소</button></div>';
+      }
+    });
+    h+='</div>';
+  }
+
+  if (dexOpen){
+    h+='<div class="dexgrid">';
+    DIDS.forEach(function(id){
+      var seen=!!g.dex[id], n=g.hold[id]||0, p=DEX[id];
+      h+='<div class="dexcell'+(seen?'':' miss')+(seen&&p.leg?' leg':'')+'" '
+       + 'title="'+(seen?esc(p.ko):'No.'+id)+'">'
+       + '<img src="'+sprite(id)+'" alt="" loading="lazy" onerror="this.style.opacity=0">'
+       + (n>1?'<span class="cnt">×'+n+'</span>':'')+'</div>';
+    });
+    h+='</div>';
+  }
+  h+='</div>';
+  return h;
+}
+
 function viewAll(){
   var once = S.tasks.filter(function(t){ return t.repeat === "once"; });
   var rout = S.tasks.filter(function(t){ return t.repeat === "weekly"; });
@@ -1812,7 +2257,8 @@ function viewAll(){
   var gotP = doneOnce.reduce(function(a,t){ return a+PTS[t.tier]; },0);
   var pct  = totP ? Math.round(gotP/totP*100) : 0;
 
-  var h = '<div class="card"><h2>한 번짜리</h2>';
+  var h = gachaCard();
+  h += '<div class="card"><h2>한 번짜리</h2>';
   if (!once.length){
     h += '<div class="empty">아직 없어. 아래에서 추가해봐.</div>';
   } else {
@@ -2284,6 +2730,31 @@ function wire(){
 }
 
 function doAct(act, n){
+  if (act === "pull"){
+    var r=doPull();
+    if (!r){ toast(gPool().length?"뽑기권이 없어":"도감을 다 채웠어"); return; }
+    mergePick=null; save(); render();
+    toast(r.neu ? DEX[r.id].ko+" 잡았다!" : DEX[r.id].ko+" (중복)");
+    return;
+  }
+  if (act === "dextoggle"){ dexOpen=!dexOpen; render(); return; }
+  if (act === "mergeopen"){
+    var mid=+n.dataset.id;
+    if (DEX[mid].to.length===1){
+      var r2=doMerge(mid, DEX[mid].to[0]);
+      if (r2){ save(); render(); toast(DEX[r2.id].ko+"(으)로 진화!"); }
+      return;
+    }
+    mergePick=mid; render(); return;
+  }
+  if (act === "mergego"){
+    var r3=doMerge(+n.dataset.id, +n.dataset.to);
+    mergePick=null;
+    if (r3){ save(); render(); toast(DEX[r3.id].ko+"(으)로 진화!"); }
+    return;
+  }
+  if (act === "mergecancel"){ mergePick=null; render(); return; }
+
   if (act === "toggle"){
     var id = n.dataset.id, ds = n.dataset.d;
     var ws = weekStart(today());
