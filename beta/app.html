@@ -557,6 +557,13 @@ button,.row,.chip,.tabs button,.condpick button,.seg button,.dowpick button{
   padding:11px 13px;border-radius:9px;font-size:12.5px;line-height:1.6;margin-bottom:14px}
 .hide{display:none !important}
 img.pix{image-rendering:pixelated}
+.pet{position:fixed;left:0;bottom:calc(env(safe-area-inset-bottom,0px) + 6px);
+  width:58px;height:58px;z-index:30;cursor:pointer;
+  -webkit-tap-highlight-color:transparent;touch-action:manipulation}
+.pet img{width:100%;height:100%;object-fit:contain;display:block;
+  filter:drop-shadow(0 2px 3px rgba(14,31,38,.28))}
+.pet.pix img{image-rendering:pixelated}
+.pet.flip img{transform:scaleX(-1)}
 .gset{margin:10px 0 2px}
 .bkask .bkrow{display:flex;gap:8px;margin-top:10px}
 .bkask .bkrow button{flex:1;padding:10px;font-size:13px}
@@ -628,6 +635,7 @@ img.pix{image-rendering:pixelated}
   <div id="view"></div>
 </div>
 
+<div id="pet" class="pet hide"><img alt="" draggable="false"></div>
 <div id="toast" role="status" aria-live="polite"></div>
 
 <script>
@@ -1082,6 +1090,78 @@ function mergeables(){ return curKey()==="pk" ? DIDS.filter(canMerge) : []; }
 
 var dexOpen=false, mergePick=null;
 
+/* Walking companion. One character you have actually caught wanders along the
+   bottom of the screen. Decoration only: it never touches points, tickets or
+   the dex, and it can only ever show something already registered. */
+var petState={x:24,dir:1,phase:"walk",until:0,cur:null,raf:null,last:0};
+
+function petPool(){
+  var out=[];
+  ["pk","sr"].forEach(function(k){
+    var D=SET(k); if(!D) return;
+    var dx=(G()[k]||{}).dex||{};
+    for (var i=0;i<D.ids.length;i++) if (dx[D.ids[i]]) out.push({k:k,id:D.ids[i]});
+  });
+  return out;
+}
+function petShow(pick){
+  var box=el("pet"); if(!box) return false;
+  var D=SET(pick.k); if(!D) return false;
+  var img=box.querySelector("img");
+  img.onerror=function(){ img.onerror=null; petNext(true); };
+  img.src=D.im(pick.id);
+  box.classList.toggle("pix", !!D.pix);
+  petState.cur=pick;
+  return true;
+}
+function petNext(quiet){
+  var p=petPool();
+  if(!p.length){ el("pet").classList.add("hide"); return; }
+  var pick=p[Math.floor(Math.random()*p.length)];
+  if(p.length>1 && petState.cur && pick.id===petState.cur.id && pick.k===petState.cur.k)
+    pick=p[(p.indexOf(pick)+1)%p.length];
+  petShow(pick);
+  el("pet").classList.remove("hide");
+  if(!quiet) petState.until=0;
+}
+function petStop(){
+  if(petState.raf){ cancelAnimationFrame(petState.raf); petState.raf=null; }
+  var b=el("pet"); if(b) b.classList.add("hide");
+}
+function petStart(){
+  petStop();
+  if(S.pet===false) return;
+  if(window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+  if(!petPool().length) return;
+  petNext(true);
+  petState.last=0;
+  petState.raf=requestAnimationFrame(petStep);
+}
+function petStep(ts){
+  petState.raf=requestAnimationFrame(petStep);
+  var box=el("pet"); if(!box || box.classList.contains("hide")) return;
+  if(!petState.last) petState.last=ts;
+  var dt=Math.min(64, ts-petState.last); petState.last=ts;
+
+  if(ts>petState.until){
+    if(petState.phase==="walk"){ petState.phase="idle"; petState.until=ts+2000+Math.random()*4000; }
+    else {
+      petState.phase="walk"; petState.until=ts+3000+Math.random()*6000;
+      if(Math.random()<0.45) petState.dir*=-1;
+      if(Math.random()<0.25) petNext(true);
+    }
+  }
+  var w=box.offsetWidth||58, max=Math.max(0, innerWidth-w-6);
+  if(petState.phase==="walk"){
+    petState.x += petState.dir*(dt*0.022);
+    if(petState.x<4){ petState.x=4; petState.dir=1; }
+    if(petState.x>max){ petState.x=max; petState.dir=-1; }
+  }
+  var bob=petState.phase==="walk" ? Math.sin(ts/170)*2.2 : Math.sin(ts/620)*1.1;
+  box.style.transform="translate("+Math.round(petState.x)+"px,"+bob.toFixed(1)+"px)";
+  box.classList.toggle("flip", petState.dir<0);
+}
+
 /* ───────── date helpers (UTC-free, local calendar) ───────── */
 function iso(d){
   return d.getFullYear() + "-" +
@@ -1122,7 +1202,8 @@ function blank(){
     seenWeek: null,
     lastBackup: null,
     backupAsked: null,          /* "YYYY-MM" — 이 달의 백업 물음에 이미 답했다 */
-    gacha: { used:0, dex:{}, hold:{}, last:null }
+    gacha: { used:0, dex:{}, hold:{}, last:null },
+    pet: true                    /* 모은 캐릭터가 화면 아래를 돌아다닌다 */
   };
 }
 
@@ -2380,6 +2461,11 @@ function gachaCard(){
      + '<input type="file" id="packfile" accept="application/json,.json" style="display:none">';
   }
 
+  h+='<div class="gline" style="margin-top:10px">'
+   + '<button class="dexbtn" style="flex:1" data-act="pettoggle">'
+   +   (S.pet===false ? "산책 켜기" : "산책 끄기") + '</button></div>'
+   + '<div class="studyhint" style="text-align:left">모은 캐릭터가 화면 아래를 돌아다녀. 툭 치면 다른 애로 바뀌어.</div>';
+
   h+='</div>';
   return h;
 }
@@ -2935,6 +3021,10 @@ function doAct(act, n){
       return;
     }
     mergePick=null; save(); render();
+    if (S.pet!==false){
+      if(!petState.raf) petStart();
+      else { petShow({k:curKey(), id:r.id}); el("pet").classList.remove("hide"); }
+    }
     var nm=SET(curKey()).nm(r.id);
     toast(r.neu ? nm+" 획득!" : nm+" (중복)");
     return;
@@ -2955,6 +3045,12 @@ function doAct(act, n){
     return;
   }
   if (act === "dextoggle"){ dexOpen=!dexOpen; render(); return; }
+  if (act === "pettoggle"){
+    S.pet = (S.pet===false); save();
+    if (S.pet) petStart(); else petStop();
+    render(); toast(S.pet ? "산책 시작" : "산책 끔");
+    return;
+  }
   if (act === "mergeopen"){
     var mid=+n.dataset.id;
     if (DEX[mid].to.length===1){
@@ -3190,6 +3286,17 @@ if (pendingReport){
 } else {
   render();
 }
+
+(function(){
+  var box=el("pet");
+  if(box){
+    box.addEventListener("click", function(){
+      petNext(false);
+      if(petState.cur) toast(SET(petState.cur.k).nm(petState.cur.id));
+    });
+  }
+  petStart();
+})();
 </script>
 
 </body>
