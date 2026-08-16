@@ -1064,6 +1064,23 @@ function doPull(){
   var k=curKey(), D=SET(k);
   if (!D || (!FREEPULL && balMins() < costOf(k))) return null;
   var p=poolOf(D,k); if (!p.length) return null;
+
+  /* A pack may name the character its very first pull should give, so someone
+     opening the set for the first time meets the one they came for. Once only,
+     and only while that set's dex is still empty. */
+  if (k==="sr" && PACK && PACK.first && dexCountOf("sr")===0){
+    var favs=[];
+    for (var f=0; f<p.length; f++) if (SRBY[p[f]].slug===PACK.first) favs.push(p[f]);
+    if (favs.length){
+      var fid=favs[Math.floor(Math.random()*favs.length)], gg=G(), sst=gg.sr;
+      if (!FREEPULL) gg.usedMins=(gg.usedMins||0)+costOf(k);
+      sst.hold[fid]=(sst.hold[fid]||0)+1;
+      sst.dex[fid]=1;
+      sst.last={id:fid, neu:true};
+      return sst.last;
+    }
+  }
+
   var tot=0, i;
   for (i=0;i<p.length;i++) tot += D.w(p[i]);
   var r=Math.random()*tot;
