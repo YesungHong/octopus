@@ -556,6 +556,8 @@ button,.row,.chip,.tabs button,.condpick button,.seg button,.dowpick button{
 .warn{background:var(--accent-soft);border:1px solid var(--accent);color:var(--accent-ink);
   padding:11px 13px;border-radius:9px;font-size:12.5px;line-height:1.6;margin-bottom:14px}
 .hide{display:none !important}
+img.pix{image-rendering:pixelated}
+.gset{margin:10px 0 2px}
 .gline{display:flex;gap:9px;align-items:center;margin:11px 0 3px}
 .gline .pull{flex:1;padding:13px;border-radius:10px;border:0;font:inherit;font-weight:700;
   font-size:14px;background:var(--accent);color:#fff;cursor:pointer}
@@ -564,7 +566,7 @@ button,.row,.chip,.tabs button,.condpick button,.seg button,.dowpick button{
   background:var(--surface);color:var(--ink-2);font:inherit;font-size:13px;cursor:pointer}
 .gres{display:flex;gap:13px;align-items:center;margin-top:12px;padding:12px;
   border-radius:11px;background:var(--surface-2);border:1px solid var(--line-soft)}
-.gres img{width:74px;height:74px;image-rendering:pixelated;flex:none}
+.gres img{width:74px;height:74px;flex:none;object-fit:contain}
 .gres .nm{font-size:16px;font-weight:700;line-height:1.35}
 .gres .mt{font-size:11.5px;color:var(--ink-3);margin-top:3px}
 .gnew{display:inline-block;margin-left:6px;padding:1px 6px;border-radius:5px;
@@ -575,14 +577,14 @@ button,.row,.chip,.tabs button,.condpick button,.seg button,.dowpick button{
   gap:5px;margin-top:11px}
 .dexcell{position:relative;aspect-ratio:1;border-radius:8px;background:var(--surface-2);
   border:1px solid var(--line-soft);display:flex;align-items:center;justify-content:center}
-.dexcell img{width:100%;height:100%;image-rendering:pixelated}
+.dexcell img{width:100%;height:100%;object-fit:contain}
 .dexcell.miss img{filter:brightness(0);opacity:.17}
 .dexcell .cnt{position:absolute;right:2px;bottom:1px;font-size:9.5px;font-weight:700;
   color:var(--ink-3)}
 .dexcell.leg{border-color:var(--accent);background:var(--accent-soft)}
 .mrow{display:flex;gap:8px;align-items:center;padding:8px 10px;border-radius:9px;
   background:var(--surface-2);border:1px solid var(--line-soft);margin-top:7px}
-.mrow img{width:38px;height:38px;image-rendering:pixelated;flex:none}
+.mrow img{width:38px;height:38px;flex:none;object-fit:contain}
 .mrow .nm{flex:1;font-size:13px;font-weight:600}
 .mrow button{padding:7px 11px;border-radius:8px;border:0;background:var(--accent);
   color:#fff;font:inherit;font-size:12px;font-weight:700;cursor:pointer}
@@ -590,7 +592,7 @@ button,.row,.chip,.tabs button,.condpick button,.seg button,.dowpick button{
 .mpick button{display:flex;flex-direction:column;align-items:center;gap:2px;
   padding:7px 9px;border-radius:9px;border:1px solid var(--line);
   background:var(--surface);color:var(--ink);font:inherit;font-size:11px;cursor:pointer}
-.mpick img{width:40px;height:40px;image-rendering:pixelated}
+.mpick img{width:40px;height:40px;object-fit:contain}
 .betabadge{display:inline-block;vertical-align:middle;margin-left:7px;
   padding:2px 7px;border-radius:6px;border:1px solid var(--accent);
   background:var(--accent-soft);color:var(--accent-ink);
@@ -915,29 +917,87 @@ var LEGW = (function(){
   return (LEGRATE*wnl/(1-LEGRATE))/nl;
 })();
 function gw(i){ return DEX[i].leg ? LEGW : STW[DEX[i].stage]; }
+function sprite(id){
+  return "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/"+id+".png";
+}
+
+/* ───────── 외부 팩 ─────────
+   A pack carries its own artwork and its own item list. Nothing from a pack
+   ships with this app or lives in the repository — it is imported from a file
+   and kept in this browser only, under its own storage key so a board backup
+   stays small and the two files never get confused for each other. */
+var PACKKEY = IS_BETA ? "octopus.pack.sr.beta" : "octopus.pack.sr";
+var PACK=null, SRBY={}, SRG={}, SRIDS=[];
+function packInstall(p){
+  PACK=p; SRBY={}; SRG={}; SRIDS=[];
+  (p.items||[]).forEach(function(it){
+    SRBY[it.id]=it; SRIDS.push(it.id);
+    (SRG[it.slug]=SRG[it.slug]||[]).push(it.id);
+  });
+}
+try {
+  var _pr = localStorage.getItem(PACKKEY);
+  if (_pr) packInstall(JSON.parse(_pr));
+} catch(e){ PACK=null; }
+
+/* ───────── 세트 공통 인터페이스 ─────────
+   Both sets answer the same questions, so pool / pull / dex code is written
+   once. Pokemon weights by evolution stage; a pack is flat. */
+function SET(k){
+  if (k==="sr"){
+    if (!PACK) return null;
+    return { key:"sr", label:(PACK.name||"팩"), ids:SRIDS, pix:false,
+      grp:function(id){ return SRBY[id].slug; },
+      mem:function(g){ return SRG[g]; },
+      w:function(){ return 1; },
+      nm:function(id){ return SRBY[id].ko; },
+      im:function(id){ return SRBY[id].img; },
+      sub:function(){ return ""; } };
+  }
+  return { key:"pk", label:"포켓몬", ids:DIDS, pix:true,
+    grp:function(id){ return DEX[id].line; },
+    mem:function(g){ return LINES[g]; },
+    w:gw,
+    nm:function(id){ return DEX[id].ko; },
+    im:sprite,
+    sub:function(id){ var p=DEX[id];
+      return "No."+String(id).padStart(3,"0")+" · "+p.ty+" · "+p.stage+"단계"+(p.leg?" · 전설":""); } };
+}
 
 function G(){
-  if (!S.gacha) S.gacha = {used:0, dex:{}, hold:{}, last:null};
-  if (!S.gacha.dex)  S.gacha.dex  = {};
-  if (!S.gacha.hold) S.gacha.hold = {};
-  return S.gacha;
+  var g=S.gacha;
+  if (!g) g = S.gacha = {used:0, set:"pk",
+                         pk:{dex:{},hold:{},last:null}, sr:{dex:{},hold:{},last:null}};
+  if (g.dex || g.hold){                    /* carry over the single-set shape */
+    g.pk={dex:g.dex||{}, hold:g.hold||{}, last:g.last||null};
+    delete g.dex; delete g.hold; delete g.last;
+  }
+  if (!g.pk) g.pk={dex:{},hold:{},last:null};
+  if (!g.sr) g.sr={dex:{},hold:{},last:null};
+  if (g.set!=="sr" && g.set!=="pk") g.set="pk";
+  return g;
 }
-/* a line leaves the pool once every member is REGISTERED — registration is
-   permanent, so merging away your copies can never re-open a finished line */
-function lineDone(L){
-  var m=LINES[L], g=G();
-  for (var k=0;k<m.length;k++) if (!g.dex[m[k]]) return false;
+function curKey(){ var g=G(); return (g.set==="sr" && PACK) ? "sr" : "pk"; }
+function gsub(k){ return G()[k||curKey()]; }
+
+/* a group leaves the pool once every member is REGISTERED — registration is
+   permanent, so merging away your copies can never re-open a finished group */
+function grpDone(D,k,g){
+  var m=D.mem(g), dx=gsub(k).dex;
+  for (var i=0;i<m.length;i++) if (!dx[m[i]]) return false;
   return true;
 }
-function gPool(){
+function poolOf(D,k){
   var out=[], memo={};
-  for (var k=0;k<DIDS.length;k++){
-    var L=DEX[DIDS[k]].line;
-    if (memo[L]===undefined) memo[L]=lineDone(L);
-    if (!memo[L]) out.push(DIDS[k]);
+  for (var i=0;i<D.ids.length;i++){
+    var id=D.ids[i], g=D.grp(id);
+    if (memo[g]===undefined) memo[g]=grpDone(D,k,g);
+    if (!memo[g]) out.push(id);
   }
   return out;
 }
+function dexCountOf(k){ var n=0, dx=gsub(k).dex; for (var i in dx) if (dx[i]) n++; return n; }
+
 function studyMins(){
   var s=0;
   for (var d in S.time) for (var id in S.time[d]) s += S.time[d][id];
@@ -945,41 +1005,40 @@ function studyMins(){
 }
 function ticketsAll(){  return Math.floor(studyMins()/MIN_PER_TICKET); }
 function ticketsLeft(){ return Math.max(0, ticketsAll() - (G().used||0)); }
-function dexCount(){ var n=0, g=G(); for (var i in g.dex) if (g.dex[i]) n++; return n; }
 
 function doPull(){
-  if (ticketsLeft() < 1) return null;
-  var p=gPool(); if (!p.length) return null;
+  var k=curKey(), D=SET(k);
+  if (!D || ticketsLeft()<1) return null;
+  var p=poolOf(D,k); if (!p.length) return null;
   var tot=0, i;
-  for (i=0;i<p.length;i++) tot += gw(p[i]);
+  for (i=0;i<p.length;i++) tot += D.w(p[i]);
   var r=Math.random()*tot;
-  for (i=0;i<p.length;i++){ r -= gw(p[i]); if (r<=0) break; }
-  var id=p[Math.min(i,p.length-1)], g=G();
+  for (i=0;i<p.length;i++){ r -= D.w(p[i]); if (r<=0) break; }
+  var id=p[Math.min(i,p.length-1)], g=G(), st=g[k];
   g.used=(g.used||0)+1;
-  g.hold[id]=(g.hold[id]||0)+1;
-  var neu=!g.dex[id];
-  g.dex[id]=1;
-  g.last={id:id, neu:neu, via:"pull"};
-  return g.last;
+  st.hold[id]=(st.hold[id]||0)+1;
+  var neu=!st.dex[id];
+  st.dex[id]=1;
+  st.last={id:id, neu:neu};
+  return st.last;
 }
-function canMerge(id){ return DEX[id].to.length>0 && (G().hold[id]||0)>=3; }
+/* merging exists only where there is something to evolve into */
+function canMerge(id){
+  return curKey()==="pk" && DEX[id].to.length>0 && (gsub("pk").hold[id]||0)>=3;
+}
 function doMerge(id, to){
-  var g=G();
   if (!canMerge(id) || DEX[id].to.indexOf(to)<0) return null;
-  g.hold[id]-=3;
-  if (!g.hold[id]) delete g.hold[id];
-  g.hold[to]=(g.hold[to]||0)+1;
-  var neu=!g.dex[to];
-  g.dex[to]=1;
-  g.last={id:to, neu:neu, via:"merge"};
-  return g.last;
+  var st=gsub("pk");
+  st.hold[id]-=3;
+  if (!st.hold[id]) delete st.hold[id];
+  st.hold[to]=(st.hold[to]||0)+1;
+  var neu=!st.dex[to];
+  st.dex[to]=1;
+  st.last={id:to, neu:neu};
+  return st.last;
 }
-function mergeables(){
-  return DIDS.filter(canMerge);
-}
-function sprite(id){
-  return "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/"+id+".png";
-}
+function mergeables(){ return curKey()==="pk" ? DIDS.filter(canMerge) : []; }
+
 var dexOpen=false, mergePick=null;
 
 /* ───────── date helpers (UTC-free, local calendar) ───────── */
@@ -2182,31 +2241,47 @@ function viewWeek(ws){
 
 /* ── 전체 ── */
 function gachaCard(){
-  var g=G(), left=ticketsLeft(), got=dexCount(), tot=DIDS.length;
+  var g=G(), k=curKey(), D=SET(k);
+  var left=ticketsLeft();
   var h='<div class="card"><h2>뽑기</h2>';
+
+  h+='<div class="seg gset">'
+   + '<button data-act="setpk" aria-pressed="'+(k==="pk")+'">포켓몬</button>'
+   + '<button data-act="setsr" aria-pressed="'+(k==="sr")+'">'+(PACK?esc(PACK.name||"팩"):"산리오")+'</button>'
+   + '</div>';
+
+  if (!D){
+    h+='<div class="empty">산리오는 그림이 앱에 들어있지 않아.<br>'
+     + '팩 파일을 불러오면 여기서 뽑을 수 있어.</div>'
+     + '<div class="gline"><button class="pull" data-act="packimp">팩 불러오기</button></div>'
+     + '<input type="file" id="packfile" accept="application/json,.json" style="display:none">'
+     + '</div>';
+    return h;
+  }
+
+  var got=dexCountOf(k), tot=D.ids.length, pool=poolOf(D,k), empty=(pool.length===0);
   h+='<div class="readout"><div class="big">'+left+'<em>장</em></div>'
    + '<div class="side">공부 '+studyMins()+'분 · '+MIN_PER_TICKET+'분에 1장<br>'
-   + '도감 <b>'+got+'</b> / '+tot+'</div></div>';
+   + esc(D.label)+' <b>'+got+'</b> / '+tot+'</div></div>';
   h+='<div class="rail"><i style="width:'+(tot?Math.round(got/tot*100):0)+'%"></i></div>';
 
-  var empty=(gPool().length===0);
   h+='<div class="gline">'
    + '<button class="pull" data-act="pull"'+((left<1||empty)?' disabled':'')+'>'
-   +   (empty?'도감 완성':'뽑기')+'</button>'
-   + '<button class="dexbtn" data-act="dextoggle">'+(dexOpen?'도감 닫기':'도감')+'</button>'
+   +   (empty?'다 모았어':'뽑기')+'</button>'
+   + '<button class="dexbtn" data-act="dextoggle">'+(dexOpen?'닫기':'도감')+'</button>'
    + '</div>';
 
   if (left<1 && !empty)
-    h+='<div class="studyhint" style="text-align:left">완료한 퀘스트에 <b>+시간</b>을 붙이면 뽑기권이 쌓여. 10분에 1장.</div>';
+    h+='<div class="studyhint" style="text-align:left">완료한 퀘스트에 <b>+시간</b>을 붙이면 뽑기권이 쌓여. '+MIN_PER_TICKET+'분에 1장.</div>';
 
-  if (g.last && DEX[g.last.id]){
-    var p=DEX[g.last.id], n=g.hold[p.id]||0;
+  var st=gsub(k);
+  if (st.last && D.ids.indexOf(st.last.id)>=0){
+    var id=st.last.id, n=st.hold[id]||0, sb=D.sub(id);
     h+='<div class="gres">'
-     + '<img src="'+sprite(p.id)+'" alt="" loading="lazy" onerror="this.style.display=\'none\'">'
-     + '<div><div class="nm">'+esc(p.ko)
-     +   (g.last.neu?'<span class="gnew">NEW</span>':'<span class="gdup">중복</span>')+'</div>'
-     + '<div class="mt">No.'+String(p.id).padStart(3,"0")+' · '+esc(p.ty)
-     +   ' · '+p.stage+'단계'+(p.leg?' · 전설':'')+' · 보유 '+n+'</div></div></div>';
+     + '<img class="'+(D.pix?"pix":"")+'" src="'+D.im(id)+'" alt="" loading="lazy" onerror="this.style.display=\'none\'">'
+     + '<div><div class="nm">'+esc(D.nm(id))
+     +   (st.last.neu?'<span class="gnew">NEW</span>':'<span class="gdup">중복</span>')+'</div>'
+     + '<div class="mt">'+(sb?esc(sb)+' · ':'')+'보유 '+n+'</div></div></div>';
   }
 
   var mg=mergeables();
@@ -2215,15 +2290,15 @@ function gachaCard(){
      + '<div class="studyhint" style="text-align:left;margin:0">같은 포켓몬 3마리 → 다음 단계 1마리</div>';
     mg.forEach(function(id){
       var p=DEX[id];
-      h+='<div class="mrow"><img src="'+sprite(id)+'" alt="" loading="lazy" onerror="this.style.display=\'none\'">'
-       + '<div class="nm">'+esc(p.ko)+' <span style="color:var(--ink-3);font-weight:400">보유 '+(G().hold[id]||0)+'</span></div>'
+      h+='<div class="mrow"><img class="pix" src="'+sprite(id)+'" alt="" loading="lazy" onerror="this.style.display=\'none\'">'
+       + '<div class="nm">'+esc(p.ko)+' <span style="color:var(--ink-3);font-weight:400">보유 '+(gsub("pk").hold[id]||0)+'</span></div>'
        + (mergePick===id ? '' : '<button data-act="mergeopen" data-id="'+id+'">진화</button>')
        + '</div>';
       if (mergePick===id){
         h+='<div class="mpick">';
         p.to.forEach(function(t){
           h+='<button data-act="mergego" data-id="'+id+'" data-to="'+t+'">'
-           + '<img src="'+sprite(t)+'" alt="" loading="lazy" onerror="this.style.display=\'none\'">'
+           + '<img class="pix" src="'+sprite(t)+'" alt="" loading="lazy" onerror="this.style.display=\'none\'">'
            + esc(DEX[t].ko)+'</button>';
         });
         h+='<button data-act="mergecancel">취소</button></div>';
@@ -2234,15 +2309,25 @@ function gachaCard(){
 
   if (dexOpen){
     h+='<div class="dexgrid">';
-    DIDS.forEach(function(id){
-      var seen=!!g.dex[id], n=g.hold[id]||0, p=DEX[id];
-      h+='<div class="dexcell'+(seen?'':' miss')+(seen&&p.leg?' leg':'')+'" '
-       + 'title="'+(seen?esc(p.ko):'No.'+id)+'">'
-       + '<img src="'+sprite(id)+'" alt="" loading="lazy" onerror="this.style.opacity=0">'
+    D.ids.forEach(function(id){
+      var seen=!!st.dex[id], n=st.hold[id]||0;
+      var leg=(k==="pk" && DEX[id].leg && seen);
+      h+='<div class="dexcell'+(seen?'':' miss')+(leg?' leg':'')+'" '
+       + 'title="'+(seen?esc(D.nm(id)):"?")+'">'
+       + '<img class="'+(D.pix?"pix":"")+'" src="'+D.im(id)+'" alt="" loading="lazy" onerror="this.style.opacity=0">'
        + (n>1?'<span class="cnt">×'+n+'</span>':'')+'</div>';
     });
     h+='</div>';
   }
+
+  if (k==="sr"){
+    h+='<div class="gline" style="margin-top:12px">'
+     + '<button class="dexbtn" style="flex:1" data-act="packexp">팩 내보내기</button>'
+     + '<button class="dexbtn" style="flex:1" data-act="packimp">팩 바꾸기</button></div>'
+     + '<div class="studyhint" style="text-align:left">팩은 그림만 담겨. 이 기기에만 저장되고 백업 파일과는 별개야.</div>'
+     + '<input type="file" id="packfile" accept="application/json,.json" style="display:none">';
+  }
+
   h+='</div>';
   return h;
 }
@@ -2686,6 +2771,29 @@ function wire(){
     });
   }
 
+  var pf = el("packfile");
+  if (pf){
+    pf.addEventListener("change", function(){
+      var file = pf.files && pf.files[0];
+      if (!file) return;
+      var fr = new FileReader();
+      fr.onload = function(){
+        var p;
+        try { p = JSON.parse(fr.result); }
+        catch(e){ toast("이 파일은 못 읽겠어"); pf.value=""; return; }
+        if (!p || p.type!=="octopus-pack" || !p.items || !p.items.length){
+          toast("옥토퍼스 팩 파일이 아닌 것 같아"); pf.value=""; return;
+        }
+        try { localStorage.setItem(PACKKEY, JSON.stringify(p)); }
+        catch(e){ toast("저장 공간이 모자라. 팩이 너무 커."); pf.value=""; return; }
+        packInstall(p);
+        G().set="sr"; save(); pf.value=""; render();
+        toast((p.name||"팩")+" 불러왔어 · "+p.items.length+"종");
+      };
+      fr.readAsText(file);
+    });
+  }
+
   var imp = el("impfile");
   if (imp){
     imp.addEventListener("change", function(){
@@ -2732,9 +2840,32 @@ function wire(){
 function doAct(act, n){
   if (act === "pull"){
     var r=doPull();
-    if (!r){ toast(gPool().length?"뽑기권이 없어":"도감을 다 채웠어"); return; }
+    if (!r){
+      var D0=SET(curKey());
+      toast(!D0 ? "팩을 먼저 불러와줘" : (poolOf(D0,curKey()).length ? "뽑기권이 없어" : "다 모았어"));
+      return;
+    }
     mergePick=null; save(); render();
-    toast(r.neu ? DEX[r.id].ko+" 잡았다!" : DEX[r.id].ko+" (중복)");
+    var nm=SET(curKey()).nm(r.id);
+    toast(r.neu ? nm+" 획득!" : nm+" (중복)");
+    return;
+  }
+  if (act === "setpk"){ G().set="pk"; mergePick=null; save(); render(); return; }
+  if (act === "setsr"){
+    if (!PACK){ toast("팩을 먼저 불러와줘"); }
+    G().set="sr"; mergePick=null; save(); render(); return;
+  }
+  if (act === "packimp"){ var pf=el("packfile"); if (pf) pf.click(); return; }
+  if (act === "packexp"){
+    if (!PACK){ toast("내보낼 팩이 없어"); return; }
+    try {
+      var blob=new Blob([JSON.stringify(PACK)], {type:"application/json"});
+      var url=URL.createObjectURL(blob), a=document.createElement("a");
+      a.href=url; a.download="octopus-pack-"+(PACK.set||"set")+".json";
+      document.body.appendChild(a); a.click(); document.body.removeChild(a);
+      setTimeout(function(){ URL.revokeObjectURL(url); }, 3000);
+      toast("팩 파일을 저장했어");
+    } catch(e){ toast("내보내기가 안 됐어"); }
     return;
   }
   if (act === "dextoggle"){ dexOpen=!dexOpen; render(); return; }
