@@ -598,6 +598,9 @@ img.pix{image-rendering:pixelated}
 .dexcell .cnt{position:absolute;right:2px;bottom:1px;font-size:9.5px;font-weight:700;
   color:var(--ink-3)}
 .dexcell.leg{border-color:var(--accent);background:var(--accent-soft)}
+.dexcell.walk{border-color:var(--accent);border-width:2px;box-shadow:0 0 0 2px var(--accent-soft)}
+.dexcell.walk::after{content:"산책";position:absolute;left:2px;top:1px;font-size:8.5px;
+  font-weight:700;color:var(--accent-ink);background:var(--accent-soft);border-radius:4px;padding:0 3px}
 .dexcell.full{border-color:var(--good)}
 .dexcell.full .cnt{color:var(--good)}
 .mrow{display:flex;gap:8px;align-items:center;padding:8px 10px;border-radius:9px;
@@ -1114,15 +1117,23 @@ function petShow(pick){
   petState.cur=pick;
   return true;
 }
-function petNext(quiet){
+/* The walker is chosen, not shuffled. Falls back to the first thing you own so
+   a stale choice can never leave the screen empty. */
+function petValid(p){
+  if(!p || !p.k || p.id===undefined || p.id===null) return false;
+  if(!SET(p.k)) return false;
+  return !!(((G()[p.k]||{}).dex)||{})[p.id];
+}
+function petChosen(){
+  if(petValid(S.petPick)) return S.petPick;
   var p=petPool();
-  if(!p.length){ el("pet").classList.add("hide"); return; }
-  var pick=p[Math.floor(Math.random()*p.length)];
-  if(p.length>1 && petState.cur && pick.id===petState.cur.id && pick.k===petState.cur.k)
-    pick=p[(p.indexOf(pick)+1)%p.length];
+  return p.length ? p[0] : null;
+}
+function petNext(){
+  var pick=petChosen();
+  if(!pick){ el("pet").classList.add("hide"); return; }
   petShow(pick);
   el("pet").classList.remove("hide");
-  if(!quiet) petState.until=0;
 }
 function petStop(){
   if(petState.raf){ cancelAnimationFrame(petState.raf); petState.raf=null; }
@@ -1133,7 +1144,7 @@ function petStart(){
   if(S.pet===false) return;
   if(window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches) return;
   if(!petPool().length) return;
-  petNext(true);
+  petNext();
   petState.last=0;
   petState.raf=requestAnimationFrame(petStep);
 }
@@ -1148,12 +1159,11 @@ function petStep(ts){
     else {
       petState.phase="walk"; petState.until=ts+3000+Math.random()*6000;
       if(Math.random()<0.45) petState.dir*=-1;
-      if(Math.random()<0.25) petNext(true);
     }
   }
   var w=box.offsetWidth||58, max=Math.max(0, innerWidth-w-6);
   if(petState.phase==="walk"){
-    petState.x += petState.dir*(dt*0.022);
+    petState.x += petState.dir*(dt*0.044);   /* 유저 요청으로 2배 */
     if(petState.x<4){ petState.x=4; petState.dir=1; }
     if(petState.x>max){ petState.x=max; petState.dir=-1; }
   }
@@ -1203,7 +1213,8 @@ function blank(){
     lastBackup: null,
     backupAsked: null,          /* "YYYY-MM" — 이 달의 백업 물음에 이미 답했다 */
     gacha: { used:0, dex:{}, hold:{}, last:null },
-    pet: true                    /* 모은 캐릭터가 화면 아래를 돌아다닌다 */
+    pet: true,                   /* 모은 캐릭터가 화면 아래를 돌아다닌다 */
+    petPick: null                /* {k,id} — 산책할 애는 직접 고른다 */
   };
 }
 
@@ -2445,12 +2456,17 @@ function gachaCard(){
       var seen=!!st.dex[id], n=st.hold[id]||0;
       var leg=(k==="pk" && DEX[id].leg && seen);
       var full=(D.cap && n>=D.cap);
-      h+='<div class="dexcell'+(seen?'':' miss')+(leg?' leg':'')+(full?' full':'')+'" '
+      var pk2=S.petPick, walking=(seen && pk2 && pk2.k===k && String(pk2.id)===String(id));
+      h+='<div class="dexcell'+(seen?'':' miss')+(leg?' leg':'')+(full?' full':'')
+       + (walking?' walk':'')+'" '
+       + (seen?'role="button" tabindex="0" data-act="petset" data-k="'+k+'" data-id="'+id+'" ':'')
        + 'title="'+(seen?esc(D.nm(id)):"?")+'">'
        + '<img class="'+(D.pix?"pix":"")+'" src="'+D.im(id)+'" alt="" loading="lazy" onerror="this.style.opacity=0">'
        + (n>1?'<span class="cnt">×'+n+'</span>':'')+'</div>';
     });
     h+='</div>';
+    h+='<div class="studyhint" style="text-align:left">잡은 칸을 누르면 그 애가 산책해. 지금은 <b>'
+     + (petChosen() ? esc(SET(petChosen().k).nm(petChosen().id)) : "없음") + '</b>.</div>';
   }
 
   if (k==="sr"){
@@ -3022,8 +3038,8 @@ function doAct(act, n){
     }
     mergePick=null; save(); render();
     if (S.pet!==false){
-      if(!petState.raf) petStart();
-      else { petShow({k:curKey(), id:r.id}); el("pet").classList.remove("hide"); }
+      if (!petValid(S.petPick)){ S.petPick={k:curKey(), id:r.id}; save(); }
+      if (!petState.raf) petStart(); else petNext();
     }
     var nm=SET(curKey()).nm(r.id);
     toast(r.neu ? nm+" 획득!" : nm+" (중복)");
@@ -3045,6 +3061,16 @@ function doAct(act, n){
     return;
   }
   if (act === "dextoggle"){ dexOpen=!dexOpen; render(); return; }
+  if (act === "petset"){
+    var pk=n.dataset.k, pid=n.dataset.id, D2=SET(pk);
+    if (!D2) return;
+    if (D2.ids.indexOf(pid)<0 && D2.ids.indexOf(+pid)>=0) pid=+pid;
+    S.petPick={k:pk, id:pid};
+    S.pet=true; save();
+    if (!petState.raf) petStart(); else petNext();
+    render(); toast(D2.nm(pid)+" 산책 시작");
+    return;
+  }
   if (act === "pettoggle"){
     S.pet = (S.pet===false); save();
     if (S.pet) petStart(); else petStop();
@@ -3291,7 +3317,6 @@ if (pendingReport){
   var box=el("pet");
   if(box){
     box.addEventListener("click", function(){
-      petNext(false);
       if(petState.cur) toast(SET(petState.cur.k).nm(petState.cur.id));
     });
   }
