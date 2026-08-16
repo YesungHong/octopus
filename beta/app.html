@@ -924,6 +924,9 @@ DEXR.forEach(function(r){
    also makes an edited study time behave exactly as expected: changing 30min
    to 60min adds 30 minutes of pulling power, no rounding drift either way. */
 var COST = { pk:20, sr:30 };
+/* beta pulls are free so artwork can be checked without grinding for tickets.
+   Production always pays. */
+var FREEPULL = IS_BETA;
 var STW  = {1:9, 2:3, 3:1};   /* each evolution step is 3x rarer */
 var LEGRATE = 0.005;          /* legendary+mythical share of a full pool */
 var LEGW = (function(){
@@ -1039,18 +1042,21 @@ function studyMins(){
    It is a balance, not a punishment — shown in muted ink, never in alarm red. */
 function balMins(){ return studyMins() - (G().usedMins||0); }
 function costOf(k){ return COST[k] || COST.pk; }
-function ticketsLeft(k){ return Math.floor(balMins()/costOf(k||curKey())); }
+function ticketsLeft(k){
+  if (FREEPULL) return Infinity;
+  return Math.floor(balMins()/costOf(k||curKey()));
+}
 
 function doPull(){
   var k=curKey(), D=SET(k);
-  if (!D || balMins() < costOf(k)) return null;
+  if (!D || (!FREEPULL && balMins() < costOf(k))) return null;
   var p=poolOf(D,k); if (!p.length) return null;
   var tot=0, i;
   for (i=0;i<p.length;i++) tot += D.w(p[i]);
   var r=Math.random()*tot;
   for (i=0;i<p.length;i++){ r -= D.w(p[i]); if (r<=0) break; }
   var id=p[Math.min(i,p.length-1)], g=G(), st=g[k];
-  g.usedMins=(g.usedMins||0)+costOf(k);
+  if (!FREEPULL) g.usedMins=(g.usedMins||0)+costOf(k);
   st.hold[id]=(st.hold[id]||0)+1;
   var neu=!st.dex[id];
   st.dex[id]=1;
@@ -2302,8 +2308,10 @@ function gachaCard(){
 
   var got=dexCountOf(k), tot=D.ids.length, pool=poolOf(D,k), empty=(pool.length===0);
   left=ticketsLeft(k);
-  h+='<div class="readout greadout"><div class="big'+(left<0?' owe':'')+'">'+left+'<em>장</em></div>'
-   + '<div class="side">'+esc(D.label)+' <span class="rate">('+costOf(k)+'분에 1장)</span>'
+  h+='<div class="readout greadout"><div class="big'+(left<0?' owe':'')+'">'
+   +   (FREEPULL ? '∞' : left+'<em>장</em>') +'</div>'
+   + '<div class="side">'+esc(D.label)+' <span class="rate">('
+   +   (FREEPULL ? '베타 · 무제한' : costOf(k)+'분에 1장') +')</span>'
    + '<br><b>'+got+'</b> / '+tot+'</div></div>';
   h+='<div class="rail"><i style="width:'+(tot?Math.round(got/tot*100):0)+'%"></i></div>';
 
@@ -2313,7 +2321,7 @@ function gachaCard(){
    + '<button class="dexbtn" data-act="dextoggle">'+(dexOpen?'닫기':'도감')+'</button>'
    + '</div>';
 
-  if (left<1 && !empty)
+  if (left<1 && !empty && !FREEPULL)
     h+='<div class="studyhint" style="text-align:left">완료한 퀘스트에 <b>+시간</b>을 붙이면 뽑기권이 쌓여. '
      + costOf(k)+'분에 1장.</div>';
 
