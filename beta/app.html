@@ -563,6 +563,8 @@ img.pix{image-rendering:pixelated}
 .greadout .big{font-size:26px}
 .greadout .big em{font-size:13px}
 .greadout{margin-bottom:11px}
+.greadout .big.owe{color:var(--ink-3)}
+.readout .side .rate{color:var(--ink-3);font-size:11px}
 .gline{display:flex;gap:9px;align-items:center;margin:11px 0 3px}
 .gline .pull{flex:1;padding:13px;border-radius:10px;border:0;font:inherit;font-weight:700;
   font-size:14px;background:var(--accent);color:#fff;cursor:pointer}
@@ -1016,13 +1018,16 @@ function studyMins(){
   for (var d in S.time) for (var id in S.time[d]) s += S.time[d][id];
   return s;
 }
-function minsLeft(){ return Math.max(0, studyMins() - (G().usedMins||0)); }
+/* the balance is allowed to go negative: deleting a study record takes back
+   the pulls it paid for, and the board says so plainly instead of hiding it.
+   It is a balance, not a punishment — shown in muted ink, never in alarm red. */
+function balMins(){ return studyMins() - (G().usedMins||0); }
 function costOf(k){ return COST[k] || COST.pk; }
-function ticketsLeft(k){ return Math.floor(minsLeft()/costOf(k||curKey())); }
+function ticketsLeft(k){ return Math.floor(balMins()/costOf(k||curKey())); }
 
 function doPull(){
   var k=curKey(), D=SET(k);
-  if (!D || minsLeft() < costOf(k)) return null;
+  if (!D || balMins() < costOf(k)) return null;
   var p=poolOf(D,k); if (!p.length) return null;
   var tot=0, i;
   for (i=0;i<p.length;i++) tot += D.w(p[i]);
@@ -2276,8 +2281,9 @@ function gachaCard(){
 
   var got=dexCountOf(k), tot=D.ids.length, pool=poolOf(D,k), empty=(pool.length===0);
   left=ticketsLeft(k);
-  h+='<div class="readout greadout"><div class="big">'+left+'<em>장</em></div>'
-   + '<div class="side">'+esc(D.label)+'<br><b>'+got+'</b> / '+tot+'</div></div>';
+  h+='<div class="readout greadout"><div class="big'+(left<0?' owe':'')+'">'+left+'<em>장</em></div>'
+   + '<div class="side">'+esc(D.label)+' <span class="rate">('+costOf(k)+'분에 1장)</span>'
+   + '<br><b>'+got+'</b> / '+tot+'</div></div>';
   h+='<div class="rail"><i style="width:'+(tot?Math.round(got/tot*100):0)+'%"></i></div>';
 
   h+='<div class="gline">'
