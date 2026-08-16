@@ -908,7 +908,11 @@ DEXR.forEach(function(r){
   (LINES[r[4]]=LINES[r[4]]||[]).push(r[0]);
 });
 
-var MIN_PER_TICKET = 20;
+/* Minutes are the currency, not tickets. Each set prices a pull differently,
+   and a ticket count can't be shared across two prices. Spending in minutes
+   also makes an edited study time behave exactly as expected: changing 30min
+   to 60min adds 30 minutes of pulling power, no rounding drift either way. */
+var COST = { pk:20, sr:30 };
 var STW  = {1:9, 2:3, 3:1};   /* each evolution step is 3x rarer */
 var LEGRATE = 0.005;          /* legendary+mythical share of a full pool */
 var LEGW = (function(){
@@ -966,12 +970,13 @@ function SET(k){
 
 function G(){
   var g=S.gacha;
-  if (!g) g = S.gacha = {used:0, set:"pk",
+  if (!g) g = S.gacha = {usedMins:0, set:"pk",
                          pk:{dex:{},hold:{},last:null}, sr:{dex:{},hold:{},last:null}};
   if (g.dex || g.hold){                    /* carry over the single-set shape */
     g.pk={dex:g.dex||{}, hold:g.hold||{}, last:g.last||null};
     delete g.dex; delete g.hold; delete g.last;
   }
+  if (g.usedMins===undefined){ g.usedMins = (g.used||0) * 20; delete g.used; }
   if (!g.pk) g.pk={dex:{},hold:{},last:null};
   if (!g.sr) g.sr={dex:{},hold:{},last:null};
   if (g.set!=="sr" && g.set!=="pk") g.set="pk";
@@ -1006,19 +1011,20 @@ function studyMins(){
   for (var d in S.time) for (var id in S.time[d]) s += S.time[d][id];
   return s;
 }
-function ticketsAll(){  return Math.floor(studyMins()/MIN_PER_TICKET); }
-function ticketsLeft(){ return Math.max(0, ticketsAll() - (G().used||0)); }
+function minsLeft(){ return Math.max(0, studyMins() - (G().usedMins||0)); }
+function costOf(k){ return COST[k] || COST.pk; }
+function ticketsLeft(k){ return Math.floor(minsLeft()/costOf(k||curKey())); }
 
 function doPull(){
   var k=curKey(), D=SET(k);
-  if (!D || ticketsLeft()<1) return null;
+  if (!D || minsLeft() < costOf(k)) return null;
   var p=poolOf(D,k); if (!p.length) return null;
   var tot=0, i;
   for (i=0;i<p.length;i++) tot += D.w(p[i]);
   var r=Math.random()*tot;
   for (i=0;i<p.length;i++){ r -= D.w(p[i]); if (r<=0) break; }
   var id=p[Math.min(i,p.length-1)], g=G(), st=g[k];
-  g.used=(g.used||0)+1;
+  g.usedMins=(g.usedMins||0)+costOf(k);
   st.hold[id]=(st.hold[id]||0)+1;
   var neu=!st.dex[id];
   st.dex[id]=1;
@@ -2245,7 +2251,7 @@ function viewWeek(ws){
 /* ── 전체 ── */
 function gachaCard(){
   var g=G(), k=curKey(), D=SET(k);
-  var left=ticketsLeft();
+  var left=0;
   var h='<div class="card"><h2>뽑기</h2>';
 
   h+='<div class="seg gset">'
@@ -2264,9 +2270,9 @@ function gachaCard(){
   }
 
   var got=dexCountOf(k), tot=D.ids.length, pool=poolOf(D,k), empty=(pool.length===0);
+  left=ticketsLeft(k);
   h+='<div class="readout"><div class="big">'+left+'<em>장</em></div>'
-   + '<div class="side">공부 '+studyMins()+'분 · '+MIN_PER_TICKET+'분에 1장<br>'
-   + esc(D.label)+' <b>'+got+'</b> / '+tot+'</div></div>';
+   + '<div class="side">'+esc(D.label)+'<br><b>'+got+'</b> / '+tot+'</div></div>';
   h+='<div class="rail"><i style="width:'+(tot?Math.round(got/tot*100):0)+'%"></i></div>';
 
   h+='<div class="gline">'
@@ -2276,7 +2282,8 @@ function gachaCard(){
    + '</div>';
 
   if (left<1 && !empty)
-    h+='<div class="studyhint" style="text-align:left">완료한 퀘스트에 <b>+시간</b>을 붙이면 뽑기권이 쌓여. '+MIN_PER_TICKET+'분에 1장.</div>';
+    h+='<div class="studyhint" style="text-align:left">완료한 퀘스트에 <b>+시간</b>을 붙이면 뽑기권이 쌓여. '
+     + costOf(k)+'분에 1장.</div>';
 
   var st=gsub(k);
   if (st.last && D.ids.indexOf(st.last.id)>=0){
@@ -2846,7 +2853,8 @@ function doAct(act, n){
     var r=doPull();
     if (!r){
       var D0=SET(curKey());
-      toast(!D0 ? "팩을 먼저 불러와줘" : (poolOf(D0,curKey()).length ? "뽑기권이 없어" : "다 모았어"));
+      toast(!D0 ? "팩을 먼저 불러와줘"
+            : (poolOf(D0,curKey()).length ? "뽑기권이 없어 · "+costOf(curKey())+"분에 1장" : "다 모았어"));
       return;
     }
     mergePick=null; save(); render();
