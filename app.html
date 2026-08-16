@@ -591,6 +591,8 @@ img.pix{image-rendering:pixelated}
 .dexcell .cnt{position:absolute;right:2px;bottom:1px;font-size:9.5px;font-weight:700;
   color:var(--ink-3)}
 .dexcell.leg{border-color:var(--accent);background:var(--accent-soft)}
+.dexcell.full{border-color:var(--good)}
+.dexcell.full .cnt{color:var(--good)}
 .mrow{display:flex;gap:8px;align-items:center;padding:8px 10px;border-radius:9px;
   background:var(--surface-2);border:1px solid var(--line-soft);margin-top:7px}
 .mrow img{width:38px;height:38px;flex:none;object-fit:contain}
@@ -959,7 +961,7 @@ try {
 function SET(k){
   if (k==="sr"){
     if (!PACK) return null;
-    return { key:"sr", label:(PACK.name||"팩"), ids:SRIDS, pix:false,
+    return { key:"sr", label:(PACK.name||"팩"), ids:SRIDS, pix:false, cap:3, groupCeil:false,
       grp:function(id){ return SRBY[id].slug; },
       mem:function(g){ return SRG[g]; },
       w:function(){ return 1; },
@@ -967,7 +969,7 @@ function SET(k){
       im:function(id){ return SRBY[id].img; },
       sub:function(){ return ""; } };
   }
-  return { key:"pk", label:"포켓몬", ids:DIDS, pix:true,
+  return { key:"pk", label:"포켓몬", ids:DIDS, pix:true, cap:0, groupCeil:true,
     grp:function(id){ return DEX[id].line; },
     mem:function(g){ return LINES[g]; },
     w:gw,
@@ -1004,14 +1006,24 @@ function grpDone(D,k,g){
   for (var i=0;i<m.length;i++) if (!dx[m[i]]) return false;
   return true;
 }
+/* Each set gets exactly one ceiling, whichever suits it.
+   Pokemon: a whole evolution line leaves once every member is registered —
+   spares still matter there because three of them merge into the next stage.
+   A pack: no merging, so the ceiling sits on the picture itself. Hold `cap`
+   of one and it steps aside, and pulls keep moving toward what you don't have. */
 function poolOf(D,k){
-  var out=[], memo={};
+  var out=[], memo={}, hold=gsub(k).hold;
   for (var i=0;i<D.ids.length;i++){
-    var id=D.ids[i], g=D.grp(id);
-    if (memo[g]===undefined) memo[g]=grpDone(D,k,g);
-    if (!memo[g]) out.push(id);
+    var id=D.ids[i];
+    if (D.groupCeil){
+      var g=D.grp(id);
+      if (memo[g]===undefined) memo[g]=grpDone(D,k,g);
+      if (memo[g]) continue;
+    }
+    if (D.cap && (hold[id]||0) >= D.cap) continue;
+    out.push(id);
   }
-  return out;
+  return out;   /* empty means finished — for a capped set that is the goal */
 }
 function dexCountOf(k){ var n=0, dx=gsub(k).dex; for (var i in dx) if (dx[i]) n++; return n; }
 
@@ -2341,7 +2353,8 @@ function gachaCard(){
     D.ids.forEach(function(id){
       var seen=!!st.dex[id], n=st.hold[id]||0;
       var leg=(k==="pk" && DEX[id].leg && seen);
-      h+='<div class="dexcell'+(seen?'':' miss')+(leg?' leg':'')+'" '
+      var full=(D.cap && n>=D.cap);
+      h+='<div class="dexcell'+(seen?'':' miss')+(leg?' leg':'')+(full?' full':'')+'" '
        + 'title="'+(seen?esc(D.nm(id)):"?")+'">'
        + '<img class="'+(D.pix?"pix":"")+'" src="'+D.im(id)+'" alt="" loading="lazy" onerror="this.style.opacity=0">'
        + (n>1?'<span class="cnt">×'+n+'</span>':'')+'</div>';
