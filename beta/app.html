@@ -1012,6 +1012,8 @@ function grpDone(D,k,g){
    A pack: no merging, so the ceiling sits on the picture itself. Hold `cap`
    of one and it steps aside, and pulls keep moving toward what you don't have. */
 function poolOf(D,k){
+  /* the game closes when the dex is full — spares are never a requirement */
+  if (dexCountOf(k) >= D.ids.length) return [];
   var out=[], memo={}, hold=gsub(k).hold;
   for (var i=0;i<D.ids.length;i++){
     var id=D.ids[i];
