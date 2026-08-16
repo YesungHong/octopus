@@ -977,7 +977,10 @@ function G(){
   if (g.set!=="sr" && g.set!=="pk") g.set="pk";
   return g;
 }
-function curKey(){ var g=G(); return (g.set==="sr" && PACK) ? "sr" : "pk"; }
+/* keep whatever the user picked, even with no pack installed — otherwise the
+   set silently snaps back to Pokemon and the "load a pack" screen is
+   unreachable. Every caller already handles SET() returning null. */
+function curKey(){ var g=G(); return g.set==="sr" ? "sr" : "pk"; }
 function gsub(k){ return G()[k||curKey()]; }
 
 /* a group leaves the pool once every member is REGISTERED — registration is
@@ -2251,8 +2254,9 @@ function gachaCard(){
    + '</div>';
 
   if (!D){
-    h+='<div class="empty">산리오는 그림이 앱에 들어있지 않아.<br>'
-     + '팩 파일을 불러오면 여기서 뽑을 수 있어.</div>'
+    h+='<div class="empty">이 세트는 그림이 앱에 들어있지 않아.<br>'
+     + '<b>팩 파일(.json)</b>을 불러오면 여기서 뽑을 수 있어.<br>'
+     + '<span style="font-size:11.5px">아래 버튼 → 파일 앱에서 <b>octopus-pack-sanrio.json</b> 선택</span></div>'
      + '<div class="gline"><button class="pull" data-act="packimp">팩 불러오기</button></div>'
      + '<input type="file" id="packfile" accept="application/json,.json" style="display:none">'
      + '</div>';
@@ -2851,10 +2855,7 @@ function doAct(act, n){
     return;
   }
   if (act === "setpk"){ G().set="pk"; mergePick=null; save(); render(); return; }
-  if (act === "setsr"){
-    if (!PACK){ toast("팩을 먼저 불러와줘"); }
-    G().set="sr"; mergePick=null; save(); render(); return;
-  }
+  if (act === "setsr"){ G().set="sr"; mergePick=null; save(); render(); return; }
   if (act === "packimp"){ var pf=el("packfile"); if (pf) pf.click(); return; }
   if (act === "packexp"){
     if (!PACK){ toast("내보낼 팩이 없어"); return; }
