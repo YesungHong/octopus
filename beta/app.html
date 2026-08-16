@@ -558,6 +558,11 @@ button,.row,.chip,.tabs button,.condpick button,.seg button,.dowpick button{
 .hide{display:none !important}
 img.pix{image-rendering:pixelated}
 .gset{margin:10px 0 2px}
+/* the gacha readout counts a handful of tickets, not a 3-digit percentage —
+   the shared 44px display number reads as a shout at that scale */
+.greadout .big{font-size:26px}
+.greadout .big em{font-size:13px}
+.greadout{margin-bottom:11px}
 .gline{display:flex;gap:9px;align-items:center;margin:11px 0 3px}
 .gline .pull{flex:1;padding:13px;border-radius:10px;border:0;font:inherit;font-weight:700;
   font-size:14px;background:var(--accent);color:#fff;cursor:pointer}
@@ -2271,7 +2276,7 @@ function gachaCard(){
 
   var got=dexCountOf(k), tot=D.ids.length, pool=poolOf(D,k), empty=(pool.length===0);
   left=ticketsLeft(k);
-  h+='<div class="readout"><div class="big">'+left+'<em>장</em></div>'
+  h+='<div class="readout greadout"><div class="big">'+left+'<em>장</em></div>'
    + '<div class="side">'+esc(D.label)+'<br><b>'+got+'</b> / '+tot+'</div></div>';
   h+='<div class="rail"><i style="width:'+(tot?Math.round(got/tot*100):0)+'%"></i></div>';
 
