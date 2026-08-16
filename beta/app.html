@@ -2852,9 +2852,21 @@ function wire(){
         if (!p || p.type!=="octopus-pack" || !p.items || !p.items.length){
           toast("옥토퍼스 팩 파일이 아닌 것 같아"); pf.value=""; return;
         }
+        /* progress is filed under item id. If the incoming pack no longer
+           carries some of those ids, the old records would point at the wrong
+           pictures — so say it plainly and start that set over. */
+        var have=Object.keys(G().sr.dex||{});
+        var ids={}; p.items.forEach(function(it){ ids[it.id]=1; });
+        var orphan=have.filter(function(x){ return !ids[x]; });
+        if (orphan.length && !confirm("이 팩은 지금 기록과 그림이 달라.\n\n"
+              + "이어서 쓰면 모은 그림이 엉뚱하게 표시돼서, 팩을 바꾸면 "
+              + "이 세트 기록(" + have.length + "종)은 처음부터 다시 시작해.\n\n계속할까?")){
+          pf.value=""; return;
+        }
         try { localStorage.setItem(PACKKEY, JSON.stringify(p)); }
         catch(e){ toast("저장 공간이 모자라. 팩이 너무 커."); pf.value=""; return; }
         packInstall(p);
+        if (orphan.length) G().sr={dex:{},hold:{},last:null};
         G().set="sr"; save(); pf.value=""; render();
         toast((p.name||"팩")+" 불러왔어 · "+p.items.length+"종");
       };
