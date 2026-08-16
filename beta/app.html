@@ -558,7 +558,7 @@ button,.row,.chip,.tabs button,.condpick button,.seg button,.dowpick button{
 .hide{display:none !important}
 img.pix{image-rendering:pixelated}
 .pet{position:fixed;left:0;bottom:calc(env(safe-area-inset-bottom,0px) + 6px);
-  width:58px;height:58px;z-index:30;cursor:pointer;
+  width:72px;height:72px;z-index:30;cursor:pointer;
   -webkit-tap-highlight-color:transparent;touch-action:manipulation}
 .pet img{width:100%;height:100%;object-fit:contain;display:block;
   filter:drop-shadow(0 2px 3px rgba(14,31,38,.28))}
@@ -1180,7 +1180,7 @@ function petStep(ts){
       if(Math.random()<0.45) petState.dir*=-1;
     }
   }
-  var w=box.offsetWidth||58, max=Math.max(0, innerWidth-w-6);
+  var w=box.offsetWidth||72, max=Math.max(0, innerWidth-w-6);
   if(petState.phase==="walk"){
     petState.x += petState.dir*(dt*0.044);   /* 유저 요청으로 2배 */
     if(petState.x<4){ petState.x=4; petState.dir=1; }
