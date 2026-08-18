@@ -642,7 +642,12 @@ img.pix{image-rendering:pixelated}
 .apedit .submitrow{margin-top:12px}
 .runrow{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:14px;
   padding:10px 12px;border-radius:9px;background:var(--sunk)}
-.runrow .rl{font-size:12px;color:var(--ink-2)}
+.runrow .rl{font-size:12px;color:var(--ink-2);display:flex;align-items:center;gap:5px;flex-wrap:wrap}
+.runin{width:56px;background:var(--bg);border:1px solid var(--line);border-radius:7px;
+  color:var(--ink);font-family:var(--font-num);font-size:15px;font-variant-numeric:tabular-nums;
+  padding:6px 4px;text-align:center}
+.runin:focus{outline:0;border-color:var(--accent)}
+.runrow .rl s{flex-basis:100%}
 .runrow .rl b{font-family:var(--font-num);font-size:14px;color:var(--ink)}
 .runrow .rl s{display:block;text-decoration:none;font-size:10.5px;color:var(--ink-3)}
 .aprow .ad s{display:block;text-decoration:none;font-size:9.5px}
@@ -2647,7 +2652,7 @@ var EXSEC = {
           {s:"수열추리", n:20, min:15} ]
 };
 var aptMode = "prac";                 /* prac | exam */
-var exdraft = { sec:null };
+var exdraft = { sec:null, run:null };   /* run=null 이면 자동, 숫자면 그 회차로 넣는다 */
 var exEditId = null, aEditId = null;   /* 기록 한 줄을 그 자리에서 고친다 */
 
 function exSecOf(ex, name){
@@ -2792,17 +2797,30 @@ function viewAptExam(){
            : '영역을 먼저 골라줘. 영역마다 총 문항 수가 달라.')
      + '</div>';
   var ro = exRunOpen(ex);
-  var willRun = exRunFor(ex, exdraft.sec);
+  var autoRun = exRunFor(ex, exdraft.sec);
+  var manual = exdraft.run !== null;
+  var willRun = manual ? exdraft.run : autoRun;
   var restMsg;
-  if (willRun !== ro.run){
+  if (manual){
+    var already = recs.filter(function(r){ return (r.run||1) === willRun; });
+    restMsg = already.length
+      ? willRun + '회차에 지금 ' + already.map(function(r){ return esc(r.sec); }).join("·") + ' 이 있어'
+      : willRun + '회차는 지금 비어 있어 — 지웠던 회차를 다시 채우는 거라면 여기가 맞아';
+  } else if (willRun !== ro.run){
     restMsg = esc(exdraft.sec) + '는 ' + ro.run + '회차에 이미 있어서 다음 회차로 넘어가';
   } else if (ro.missing.length === EXSEC[ex].length){
     restMsg = '이 회차의 시작 · ' + EXSEC[ex].map(function(x){ return x.s; }).join("·") + ' 다 채우면 다음 회차로 넘어가';
   } else {
     restMsg = '이 회차에 남은 영역 — ' + ro.missing.map(esc).join(" · ");
   }
-  h += '<div class="runrow"><div class="rl">이 기록은 <b>'+ willRun +'회차</b>'
-     + '<s>'+ restMsg +'</s></div></div>';
+  /* Normally the app works the 회차 out on its own, but a record deleted by
+     mistake has to be able to go back where it was — so the number is a field,
+     not a readout. */
+  h += '<div class="runrow"><div class="rl">이 기록은'
+     + '<input type="number" class="runin" id="exrun" inputmode="numeric" min="1" max="999" value="'+ willRun +'">'
+     + '회차<s>'+ restMsg +'</s></div>'
+     + (manual ? '<button class="hbtn" data-act="exrunauto">자동으로</button>' : '')
+     + '</div>';
   h += '<button class="addbtn" data-act="exadd" style="width:100%;margin-top:12px">시험 기록 추가</button>';
   h += '</div>';
 
@@ -2900,8 +2918,9 @@ function viewAptExam(){
            +   '<label>틀린<input type="number" id="exewr" inputmode="numeric" min="0" max="99" value="'+ r.wr +'"></label>'
            +   '<label>못 푼<input type="number" id="exesk" inputmode="numeric" min="0" max="99" value="'+ r.sk +'"></label>'
            + '</div>'
-           + '<div class="numgrid" style="grid-template-columns:1fr">'
+           + '<div class="numgrid">'
            +   '<label>회차<input type="number" id="exerun" inputmode="numeric" min="1" max="999" value="'+ (r.run||1) +'"></label>'
+           +   '<label>날짜<input type="date" id="exedate" value="'+ r.ds +'"></label>'
            + '</div>'
            + '<div class="submitrow">'
            +   '<button class="ghost" data-act="exeditcancel">취소</button>'
@@ -3696,6 +3715,16 @@ function wire(){
     });
   }
 
+  var runBox = el("exrun");
+  if (runBox){
+    /* the chips re-render on every tap, so the typed 회차 lives in the draft */
+    runBox.addEventListener("input", function(){
+      var v = parseInt(runBox.value, 10);
+      exdraft.run = (isNaN(v) || v < 1) ? null : v;
+    });
+    runBox.addEventListener("change", function(){ render(); });
+  }
+
   var pf = el("packfile");
   if (pf){
     pf.addEventListener("change", function(){
@@ -4024,11 +4053,14 @@ function doAct(act, n){
     if (isNaN(erun) || erun < 1){ toast("회차는 1 이상이어야 해"); return; }
     er.ok = eok; er.wr = ewr; er.sk = esk;
     var runMoved = (er.run||1) !== erun;
+    var edv = el("exedate").value;
+    if (/^\d{4}-\d{2}-\d{2}$/.test(edv)) er.ds = edv;
     er.run = erun;
     exEditId = null; save(); render();
     toast(runMoved ? erun + "회차로 옮겼어 🐙" : "고쳤어 🐙");
     return;
   }
+  if (act === "exrunauto"){ exdraft.run = null; render(); return; }
   if (act === "exrenum"){
     var rr = exRenumber(adraft.exam);
     if (!rr.moved){ toast("이미 1회차부터 빈틈없이 붙어 있어"); return; }
@@ -4081,9 +4113,10 @@ function doAct(act, n){
     }
     var xid = 1;
     (S.aptex || []).forEach(function(r){ var k = +String(r.id).slice(1) || 0; if (k >= xid) xid = k+1; });
-    var xrun = exRunFor(adraft.exam, exdraft.sec);
+    var xrun = exdraft.run !== null ? exdraft.run : exRunFor(adraft.exam, exdraft.sec);
     S.aptex.push({ id:"x"+xid, ds:iso(today()), exam:adraft.exam, sec:exdraft.sec,
                    ok:xok, wr:xwr, sk:xsk, run:xrun });
+    exdraft.run = null;                     /* 한 건 넣고 나면 다시 자동으로 */
     save(); render();
     toast(xrun + "회차 " + exdraft.sec + " " + pctText(exAcc({ok:xok,wr:xwr})) + " · 푼 양 "
           + pctText((xok+xwr)/scd.n) + " 🐙");
