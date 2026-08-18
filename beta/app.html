@@ -630,6 +630,9 @@ img.pix{image-rendering:pixelated}
 .legend{display:flex;flex-wrap:wrap;gap:5px 12px;margin:10px 0 2px}
 .lgi{display:flex;align-items:center;gap:5px;font-size:11.5px;color:var(--ink-2)}
 .lgi.off{opacity:.4}
+.lgi{cursor:pointer}
+.lgi.hid{opacity:.32;text-decoration:line-through;text-decoration-thickness:1px}
+.lgi:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:5px}
 .lgi svg{width:12px;height:12px;flex:none}
 .lgi i{font-style:normal;font-family:var(--font-num);font-size:10.5px;color:var(--ink-3)}
 .card > h2.h2row{display:flex;align-items:center;gap:8px}
@@ -1298,7 +1301,8 @@ function blank(){
     backupAsked: null,          /* "YYYY-MM" — 이 달의 백업 물음에 이미 답했다 */
     aptit: [],                   /* 인적성 연습 기록 — pt와 완전히 분리 */
     aptex: [],                   /* 인적성 시험 기록 (영역 통째로) */
-    aptexV: 2,                   /* 회차 세는 방식 버전 — 2 = 영역별 */
+    aptitV: 2,                   /* 연습 회차 버전 — 2 = 유형별 */
+    aptexV: 2,                   /* 시험 회차 버전 — 2 = 영역별 */
     gacha: { used:0, dex:{}, hold:{}, last:null },
     pet: true,                   /* 모은 캐릭터가 화면 아래를 돌아다닌다 */
     petPick: null                /* {k,id} — 산책할 애는 직접 고른다 */
@@ -1335,21 +1339,18 @@ function load(){
   S = fromHash || stored || blank();
   if (fromHash) toast("링크에서 불러왔어");
 
-  var b = blank();
-  for (var k in b) if (!(k in S)) S[k] = b[k];
-
-  /* sweep minutes and log entries left behind by tasks deleted before the
-     deletion path cleaned up after itself */
-  var live = {};
-  (S.tasks || []).forEach(function(t){ live[t.id] = 1; });
-  [S.time, S.log].forEach(function(store){
-    for (var d in store){
-      for (var id in store[d]) if (!live[id]) delete store[d][id];
-      if (!Object.keys(store[d]).length) delete store[d];
-    }
-  });
-  /* 회차를 시험 단위로 세던 시절의 기록을 영역 단위로 다시 매긴다. 순서(무엇을
-     먼저 봤나)는 그대로 두고 번호만 영역 안에서 1..N으로 고쳐 붙인다. */
+  if (S.aptitV !== 2){
+    var seenP = {};
+    (S.aptit || []).slice().sort(function(a,b){
+      if (a.ds !== b.ds) return a.ds < b.ds ? -1 : 1;
+      return a.id < b.id ? -1 : 1;
+    }).forEach(function(r){
+      var k = r.exam + "|" + r.type;
+      seenP[k] = (seenP[k] || 0) + 1;
+      r.run = seenP[k];
+    });
+    S.aptitV = 2;
+  }
   if (S.aptexV !== 2){
     var seenRun = {};
     (S.aptex || []).slice().sort(function(a,b){
@@ -1365,6 +1366,21 @@ function load(){
     S.aptexV = 2;
   }
 
+  var b = blank();
+  for (var k in b) if (!(k in S)) S[k] = b[k];
+
+  /* sweep minutes and log entries left behind by tasks deleted before the
+     deletion path cleaned up after itself */
+  var live = {};
+  (S.tasks || []).forEach(function(t){ live[t.id] = 1; });
+  [S.time, S.log].forEach(function(store){
+    for (var d in store){
+      for (var id in store[d]) if (!live[id]) delete store[d][id];
+      if (!Object.keys(store[d]).length) delete store[d];
+    }
+  });
+  /* 회차를 시험 단위로 세던 시절의 기록을 영역 단위로 다시 매긴다. 순서(무엇을
+     먼저 봤나)는 그대로 두고 번호만 영역 안에서 1..N으로 고쳐 붙인다. */
   /* seed on first run so the question starts at the next month boundary
      rather than firing the moment this version lands mid-month */
   if (!S.backupAsked) S.backupAsked = monthKey(today());
@@ -2604,6 +2620,20 @@ var APT = {
   skct: { nm:"SKCT", groups:[
     { g:"유형", ts:["언어이해","자료해석","창의수리","언어추리","수열추리"] } ] }
 };
+/* shape + colour per 유형, so eight of them can share one chart */
+var TSTYLE = {
+  gsat: { "응용수리":{mk:"dot", c:"var(--t2)"},     "자료해석":{mk:"tri", c:"var(--accent)"},
+          "명제":{mk:"sq",  c:"var(--good)"},        "추리퀴즈":{mk:"dia", c:"var(--cs3)"},
+          "도형추리":{mk:"plus",c:"var(--cs5)"},     "도식추리":{mk:"ring",c:"var(--t3)"},
+          "단어유추":{mk:"dtri",c:"var(--cs2)"},     "논리추론":{mk:"ex",  c:"var(--cs4)"} },
+  skct: { "언어이해":{mk:"dot", c:"var(--t2)"},      "자료해석":{mk:"tri", c:"var(--accent)"},
+          "창의수리":{mk:"sq",  c:"var(--good)"},     "언어추리":{mk:"dia", c:"var(--cs3)"},
+          "수열추리":{mk:"plus",c:"var(--cs5)"} }
+};
+function tstyle(ex, t){ return (TSTYLE[ex] && TSTYLE[ex][t]) || {mk:"dot", c:"var(--ink-3)"}; }
+/* series hidden by tapping the legend — view state, never saved */
+var hidSeries = {};
+function serKey(ex, name){ return ex + "|" + name; }
 var TOD  = { am:"오전", pm:"오후", eve:"저녁" };
 var TODK = ["am","pm","eve"];
 function todNow(){ var h = new Date().getHours(); return h < 12 ? "am" : (h < 18 ? "pm" : "eve"); }
@@ -2612,13 +2642,43 @@ function aptTypes(ex){
   APT[ex].groups.forEach(function(gr){ gr.ts.forEach(function(t){ o.push(t); }); });
   return o;
 }
-var adraft = { exam:"gsat", type:null, tod:null };
+var adraft = { exam:"gsat", type:null, tod:null, run:null };
 
-function aptRecs(ex){
+function aptRecs(ex, type){
   var rs = (S.aptit || []).slice();
-  if (ex) rs = rs.filter(function(r){ return r.exam === ex; });
-  rs.sort(function(a,b){ return a.ds < b.ds ? -1 : (a.ds > b.ds ? 1 : (a.id < b.id ? -1 : 1)); });
+  if (ex)   rs = rs.filter(function(r){ return r.exam === ex; });
+  if (type) rs = rs.filter(function(r){ return r.type === type; });
+  rs.sort(function(a,b){
+    var ar = a.run||1, br = b.run||1;
+    if (ar !== br) return ar - br;
+    return a.ds < b.ds ? -1 : (a.ds > b.ds ? 1 : (a.id < b.id ? -1 : 1));
+  });
   return rs;
+}
+/* 회차 is counted inside one 유형, exactly like 시험 counts inside one 영역 */
+function aptNextRun(ex, type){
+  if (!type) return 1;
+  var top = 0;
+  aptRecs(ex, type).forEach(function(r){ if ((r.run||1) > top) top = r.run||1; });
+  return top + 1;
+}
+function aptMaxRun(ex){
+  var top = 1;
+  aptRecs(ex).forEach(function(r){ if ((r.run||1) > top) top = r.run||1; });
+  return top;
+}
+function aptRenumber(ex){
+  var moved = 0;
+  aptTypes(ex).forEach(function(t){
+    var rs = aptRecs(ex, t), runs = [];
+    rs.forEach(function(r){ var v = r.run||1; if (runs.indexOf(v) < 0) runs.push(v); });
+    runs.sort(function(a,b){ return a-b; });
+    rs.forEach(function(r){
+      var to = runs.indexOf(r.run||1) + 1;
+      if ((r.run||1) !== to){ r.run = to; moved++; }
+    });
+  });
+  return { moved:moved };
 }
 /* weighted by items, not by set — a 20-item set says more than a 5-item one */
 function accOf(rs){
@@ -2735,6 +2795,14 @@ function mark(kind, x, y, col){
          + (x+r+.8).toFixed(1) +','+ y.toFixed(1) +' '
          + x.toFixed(1) +','+ (y+r+.8).toFixed(1) +' '
          + (x-r-.8).toFixed(1) +','+ y.toFixed(1) +'" fill="'+col+'"/>';
+  if (kind === "dtri")
+    return '<polygon points="'+ x.toFixed(1) +','+ (y+r+.6).toFixed(1) +' '
+         + (x-r-.4).toFixed(1) +','+ (y-r).toFixed(1) +' '
+         + (x+r+.4).toFixed(1) +','+ (y-r).toFixed(1) +'" fill="'+col+'"/>';
+  if (kind === "ex")
+    return '<path d="M'+ (x-r).toFixed(1) +' '+ (y-r).toFixed(1) +'l'+ (r*2).toFixed(1) +' '+ (r*2).toFixed(1)
+         + 'M'+ (x+r).toFixed(1) +' '+ (y-r).toFixed(1) +'l-'+ (r*2).toFixed(1) +' '+ (r*2).toFixed(1)
+         + '" stroke="'+col+'" stroke-width="2" stroke-linecap="round"/>';
   if (kind === "ring")
     return '<circle cx="'+ x.toFixed(1) +'" cy="'+ y.toFixed(1) +'" r="'+(r-.4)
          + '" fill="none" stroke="'+col+'" stroke-width="1.8"/>';
@@ -2778,15 +2846,21 @@ function multiChart(series, o){
   s += '</svg>';
   return s;
 }
+/* Tap a legend entry to drop that series out of the charts. Eight 유형 on one
+   axis is unreadable; hiding is view-only and never touches a record. */
 function chartLegend(ex, series){
   var lg = '<div class="legend">';
   series.forEach(function(sr){
-    var n = sr.pts.length;
-    lg += '<span class="lgi'+(n?'':' off')+'">'
+    var n = sr.pts.length, off = hidSeries[serKey(ex, sr.name)];
+    lg += '<span class="lgi'+(n ? (off?' hid':'') : ' off')+'" role="button" tabindex="0" '
+        + 'data-act="lgtog" data-x="'+ ex +'" data-n="'+ esc(sr.name) +'">'
         + '<svg viewBox="0 0 12 12" aria-hidden="true">'+ mark(sr.mk, 6, 6, sr.color) +'</svg>'
         + esc(sr.name) +'<i>'+ n +'회</i></span>';
   });
   return lg + '</div>';
+}
+function visible(ex, series){
+  return series.filter(function(sr){ return !hidSeries[serKey(ex, sr.name)]; });
 }
 
 function viewAptExam(){
@@ -2888,13 +2962,13 @@ function viewAptExam(){
     h += chartLegend(ex, accS);
 
     h += '<div class="chead"><span>정답률<i>맞은 / 푼 것</i></span></div>';
-    h += multiChart(accS, {xMax:xMax, yMax:100, tick:pctTick, aria:"영역별 회차 정답률"});
+    h += multiChart(visible(ex, accS), {xMax:xMax, yMax:100, tick:pctTick, aria:"영역별 회차 정답률"});
 
     h += '<div class="chead"><span>푼 양<i>못 푼 문항을 뺀 비율</i></span></div>';
-    h += multiChart(rchS, {xMax:xMax, yMax:100, tick:pctTick, aria:"영역별 회차 푼 양"});
+    h += multiChart(visible(ex, rchS), {xMax:xMax, yMax:100, tick:pctTick, aria:"영역별 회차 푼 양"});
 
     h += '<div class="chead"><span>맞은 개수<i>영역 문항 기준</i></span></div>';
-    h += multiChart(okS, {xMax:xMax, yMax:Math.max(5, allN),
+    h += multiChart(visible(ex, okS), {xMax:xMax, yMax:Math.max(5, allN),
                           tick:function(v){ return Math.round(v)+""; }, aria:"영역별 회차 맞은 개수"});
 
     h += '<div class="cnote">정답률은 <b>고른 것 중 얼마나 맞았나</b>, 푼 양은 '
@@ -3020,12 +3094,96 @@ function viewApt(){
      + '<label>걸린 시간 (분)<input type="number" id="amin" inputmode="numeric" min="0" max="600" placeholder="12"></label>'
      + '<label>초<input type="number" id="asec" inputmode="numeric" min="0" max="59" placeholder="0"></label>'
      + '</div>';
-  h += '<button class="addbtn" data-act="aadd" style="width:100%;margin-top:12px">기록 추가</button>';
   h += '<div class="studyhint" style="text-align:left">시간은 비워둬도 돼. 적으면 문항당 속도까지 같이 봐줄게.</div>';
+
+  var aAuto = aptNextRun(ex, adraft.type);
+  var aMan = adraft.run !== null;
+  var aWill = aMan ? adraft.run : aAuto;
+  var aMsg;
+  if (!adraft.type){
+    aMsg = '유형을 고르면 그 유형의 다음 회차가 잡혀';
+  } else if (aMan){
+    var aTaken = aptRecs(ex, adraft.type).filter(function(r){ return (r.run||1) === aWill; });
+    aMsg = aTaken.length
+      ? esc(adraft.type) +' '+ aWill +'회차는 이미 있어 — 저장하면 같은 번호가 둘이 돼'
+      : esc(adraft.type) +' '+ aWill +'회차는 비어 있어 · 지웠던 회차를 다시 채우는 거라면 여기가 맞아';
+  } else {
+    aMsg = esc(adraft.type) +'만 세서 '+ aWill +'번째야 · 유형마다 따로 세';
+  }
+  h += '<div class="runrow"><div class="rl">'
+     + (adraft.type ? esc(adraft.type) : '이 기록은')
+     + '<input type="number" class="runin" id="aprun" inputmode="numeric" min="1" max="999" value="'+ aWill +'">'
+     + '회차<s>'+ aMsg +'</s></div>'
+     + (aMan ? '<button class="hbtn" data-act="aprunauto">자동으로</button>' : '')
+     + '</div>';
+  h += '<button class="addbtn" data-act="aadd" style="width:100%;margin-top:12px">기록 추가</button>';
+  h += '</div>';
+
+  /* ── 그래프 ── */
+  h += '<div class="card"><h2>추이<em>'+ APT[ex].nm +' · 유형별 회차</em></h2>';
+  if (!recs.length){
+    h += aneed("한 세트만 적어도 점이 하나 찍혀. 같은 유형을 두 번째 풀 때부터 선이 생겨.");
+  } else {
+    var pxMax = aptMaxRun(ex);
+    var pmk = function(val){
+      var out = aptTypes(ex).map(function(t){
+        var st = tstyle(ex, t);
+        return { name:t, mk:st.mk, color:st.c,
+                 pts: aptRecs(ex, t).map(function(r){ return { x:(r.run||1), v:val(r) }; })
+                        .filter(function(p){ return p.v !== null; }) };
+      }).filter(function(sr){ return sr.pts.length; });
+      var byRun = {};
+      aptRecs(ex).forEach(function(r){
+        var k = r.run||1;
+        if (!byRun[k]) byRun[k] = { n:0, ok:0, sec:0, secN:0 };
+        byRun[k].n += r.n; byRun[k].ok += r.ok;
+        if (r.sec > 0){ byRun[k].sec += r.sec; byRun[k].secN += r.n; }
+      });
+      var tp = Object.keys(byRun).map(Number).sort(function(a,b){ return a-b; })
+        .map(function(k){ return { x:k, v:val(byRun[k]) }; })
+        .filter(function(p){ return p.v !== null; });
+      out.push({ name:"전체", mk:"ring", color:"var(--ink-2)", pts:tp });
+      return out;
+    };
+    var pAcc  = pmk(function(r){ return r.n ? r.ok/r.n*100 : null; });
+    var pPace = pmk(function(r){
+      var sN = r.secN !== undefined ? r.secN : (r.sec > 0 ? r.n : 0);
+      return sN ? r.sec/sN : null;
+    });
+    var pVol  = pmk(function(r){ return r.n; });
+
+    var paceMax = 30;
+    pPace.forEach(function(sr){ sr.pts.forEach(function(p){ if (p.v > paceMax) paceMax = p.v; }); });
+    paceMax = Math.ceil(paceMax/15)*15;
+    var volMax = 10;
+    pVol.forEach(function(sr){ sr.pts.forEach(function(p){ if (p.v > volMax) volMax = p.v; }); });
+
+    h += '<div class="secintro">시험이랑 같아 — 가로축은 <b>그 유형의 회차</b>고, '
+       + '<b>전체</b>는 같은 회차 번호를 합친 값이야. '
+       + '유형이 많으니까 <b>범례를 눌러 켜고 끌 수 있어.</b></div>';
+    h += chartLegend(ex, pAcc);
+
+    h += '<div class="chead"><span>정답률<i>맞은 / 푼 것</i></span></div>';
+    h += multiChart(visible(ex, pAcc), {xMax:pxMax, yMax:100,
+           tick:function(v){ return Math.round(v)+""; }, aria:"유형별 회차 정답률"});
+
+    h += '<div class="chead"><span>문항당 시간<i>초 · 낮을수록 빠름</i></span></div>';
+    h += multiChart(visible(ex, pPace), {xMax:pxMax, yMax:paceMax,
+           tick:function(v){ return Math.round(v)+""; }, aria:"유형별 회차 문항당 시간"});
+
+    h += '<div class="chead"><span>푼 문항<i>그 회차에 푼 개수</i></span></div>';
+    h += multiChart(visible(ex, pVol), {xMax:pxMax, yMax:volMax,
+           tick:function(v){ return Math.round(v)+""; }, aria:"유형별 회차 푼 문항"});
+
+    h += '<div class="cnote">정답률이 오르는데 <b>문항당 시간도 같이 오르면</b> 실력이 아니라 '
+       + '<b>더 오래 붙잡고 있는 것</b>일 수 있어. 시험은 시간이 고정이니까 두 줄을 같이 봐야 해.</div>';
+  }
   h += '</div>';
 
   /* ── 최근 기록 ── */
-  h += '<div class="card"><h2>최근 기록<em>'+ APT[ex].nm +'</em></h2>';
+  h += '<div class="card"><h2 class="h2row">최근 기록<em>'+ APT[ex].nm +'</em>'
+     + (recs.length ? '<button class="hbtn" data-act="aprenum">회차 정리</button>' : '')
+     + '</h2>';
   if (!recs.length){
     h += '<div class="empty">아직 '+ APT[ex].nm +' 기록이 없어.<br>한 세트 풀고 위에 적어봐.</div>';
   } else {
@@ -3045,6 +3203,10 @@ function viewApt(){
            +   '<label>초<input type="number" id="aesec" inputmode="numeric" min="0" max="59" value="'
            +      (r.sec > 0 ? (r.sec%60) : "") +'"></label>'
            + '</div>'
+           + '<div class="numgrid">'
+           +   '<label>회차<input type="number" id="aerun" inputmode="numeric" min="1" max="999" value="'+ (r.run||1) +'"></label>'
+           +   '<label>날짜<input type="date" id="aedate" value="'+ r.ds +'"></label>'
+           + '</div>'
            + '<div class="tglab">언제 풀었어</div><div class="seg">'
            +   TODK.map(function(k){
                  return '<button data-act="aedittod" data-x="'+k+'" data-id="'+ r.id +'" aria-pressed="'
@@ -3058,7 +3220,7 @@ function viewApt(){
         return;
       }
       h += '<div class="aprow">'
-         + '<div class="ad">'+ md(d) +'</div>'
+         + '<div class="ad">'+ (r.run||1) +'회<s>'+ md(d) +'</s></div>'
          + '<div class="at">'+ esc(r.type) +'<s>'+ TOD[r.tod] +' · '+ r.ok +'/'+ r.n +'문항'
          +   (r.sec > 0 ? ' · '+ secText(r.sec) : '') +'</s></div>'
          + '<div class="ar">'+ Math.round(r.ok/r.n*100) +'%'
@@ -3750,6 +3912,15 @@ function wire(){
     });
   }
 
+  var apRunBox = el("aprun");
+  if (apRunBox){
+    apRunBox.addEventListener("input", function(){
+      var v = parseInt(apRunBox.value, 10);
+      adraft.run = (isNaN(v) || v < 1) ? null : v;
+    });
+    apRunBox.addEventListener("change", function(){ render(); });
+  }
+
   var runBox = el("exrun");
   if (runBox){
     /* the chips re-render on every tap, so the typed 회차 lives in the draft */
@@ -4096,6 +4267,18 @@ function doAct(act, n){
     return;
   }
   if (act === "exrunauto"){ exdraft.run = null; render(); return; }
+  if (act === "aprunauto"){ adraft.run = null; render(); return; }
+  if (act === "aprenum"){
+    var pr = aptRenumber(adraft.exam);
+    if (!pr.moved){ toast("이미 1회차부터 빈틈없이 붙어 있어"); return; }
+    save(); render(); toast(pr.moved + "건을 당겼어 🐙");
+    return;
+  }
+  if (act === "lgtog"){
+    var lk = serKey(n.dataset.x, n.dataset.n);
+    if (hidSeries[lk]) delete hidSeries[lk]; else hidSeries[lk] = 1;
+    render(); return;
+  }
   if (act === "exrenum"){
     var rr = exRenumber(adraft.exam);
     if (!rr.moved){ toast("이미 1회차부터 빈틈없이 붙어 있어"); return; }
@@ -4121,8 +4304,15 @@ function doAct(act, n){
     if (vok > vn){ toast("맞은 개수가 푼 문항보다 많아"); return; }
     var vmin = parseInt(el("aemin").value, 10) || 0;
     var vsec = parseInt(el("aesec").value, 10) || 0;
+    var vrun = parseInt(el("aerun").value, 10);
+    if (isNaN(vrun) || vrun < 1){ toast("회차는 1 이상이어야 해"); return; }
+    var vdate = el("aedate").value;
+    if (/^\d{4}-\d{2}-\d{2}$/.test(vdate)) ar.ds = vdate;
     ar.n = vn; ar.ok = vok; ar.sec = vmin*60 + vsec;
-    aEditId = null; save(); render(); toast("고쳤어 🐙");
+    var vMoved = (ar.run||1) !== vrun;
+    ar.run = vrun;
+    aEditId = null; save(); render();
+    toast(vMoved ? vrun + "회차로 옮겼어 🐙" : "고쳤어 🐙");
     return;
   }
   if (act === "exsec"){
@@ -4180,10 +4370,12 @@ function doAct(act, n){
     var asec = parseInt(el("asec").value, 10) || 0;
     var nid = 1;
     (S.aptit || []).forEach(function(r){ var k = +String(r.id).slice(1) || 0; if (k >= nid) nid = k+1; });
+    var arun = adraft.run !== null ? adraft.run : aptNextRun(adraft.exam, adraft.type);
     S.aptit.push({ id:"a"+nid, ds:iso(today()), exam:adraft.exam, type:adraft.type,
-                   n:an, ok:aok, sec:amin*60+asec, tod:adraft.tod });
+                   n:an, ok:aok, sec:amin*60+asec, tod:adraft.tod, run:arun });
+    adraft.run = null;
     save(); render();
-    toast(adraft.type + " " + Math.round(aok/an*100) + "% 기록했어 🐙");
+    toast(adraft.type + " " + arun + "회차 · " + Math.round(aok/an*100) + "% 🐙");
     return;
   }
   if (act === "adel"){
