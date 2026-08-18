@@ -627,6 +627,11 @@ img.pix{image-rendering:pixelated}
 .tchips button:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
 .numgrid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:14px}
 .numgrid.three{grid-template-columns:1fr 1fr 1fr}
+.legend{display:flex;flex-wrap:wrap;gap:5px 12px;margin:10px 0 2px}
+.lgi{display:flex;align-items:center;gap:5px;font-size:11.5px;color:var(--ink-2)}
+.lgi.off{opacity:.4}
+.lgi svg{width:12px;height:12px;flex:none}
+.lgi i{font-style:normal;font-family:var(--font-num);font-size:10.5px;color:var(--ink-3)}
 .card > h2.h2row{display:flex;align-items:center;gap:8px}
 .card > h2.h2row em{flex:1}
 .hbtn{appearance:none;border:1px solid var(--line);background:var(--bg);color:var(--ink-2);
@@ -1293,6 +1298,7 @@ function blank(){
     backupAsked: null,          /* "YYYY-MM" — 이 달의 백업 물음에 이미 답했다 */
     aptit: [],                   /* 인적성 연습 기록 — pt와 완전히 분리 */
     aptex: [],                   /* 인적성 시험 기록 (영역 통째로) */
+    aptexV: 2,                   /* 회차 세는 방식 버전 — 2 = 영역별 */
     gacha: { used:0, dex:{}, hold:{}, last:null },
     pet: true,                   /* 모은 캐릭터가 화면 아래를 돌아다닌다 */
     petPick: null                /* {k,id} — 산책할 애는 직접 고른다 */
@@ -1342,16 +1348,22 @@ function load(){
       if (!Object.keys(store[d]).length) delete store[d];
     }
   });
-  /* 회차 없이 저장된 시험 기록에 회차를 매긴다 — 그때는 하루가 곧 한 회차였다 */
-  var runSeen = {};
-  (S.aptex || []).slice().sort(function(a,b){ return a.ds < b.ds ? -1 : (a.ds > b.ds ? 1 : 0); })
-    .forEach(function(r){
-      if (r.run) return;
-      if (!runSeen[r.exam]) runSeen[r.exam] = { ds:null, run:0 };
-      var st = runSeen[r.exam];
-      if (st.ds !== r.ds){ st.ds = r.ds; st.run++; }
-      r.run = st.run;
+  /* 회차를 시험 단위로 세던 시절의 기록을 영역 단위로 다시 매긴다. 순서(무엇을
+     먼저 봤나)는 그대로 두고 번호만 영역 안에서 1..N으로 고쳐 붙인다. */
+  if (S.aptexV !== 2){
+    var seenRun = {};
+    (S.aptex || []).slice().sort(function(a,b){
+      if (a.ds !== b.ds) return a.ds < b.ds ? -1 : 1;
+      var ar = a.run||1, br = b.run||1;
+      if (ar !== br) return ar - br;
+      return a.id < b.id ? -1 : 1;
+    }).forEach(function(r){
+      var k = r.exam + "|" + r.sec;
+      seenRun[k] = (seenRun[k] || 0) + 1;
+      r.run = seenRun[k];
     });
+    S.aptexV = 2;
+  }
 
   /* seed on first run so the question starts at the next month boundary
      rather than firing the moment this version lands mid-month */
@@ -2644,136 +2656,149 @@ function aneed(txt){ return '<div class="need">'+ txt +'</div>'; }
    연습(10문제 세트)과 저장소부터 분리한다. 재는 것이 다르기 때문 — 연습은
    "유형별로 얼마나 맞나", 시험은 "제한시간 안에 어디까지 가나"다. 시험에서는
    시간을 묻지 않는다. 시간이 고정된 게 시험이니까, 대신 못 푼 문항이 그
-   시간을 말해준다. */
+   시간을 말해준다.
+
+   회차는 영역마다 따로 센다. 수리를 세 번, 추리를 한 번 봤으면 수리 3회차와
+   추리 1회차이지 전체 4회차가 아니다 — 영역별로 자기 진도가 따로 흐른다.
+   그래프는 한 판에 겹쳐 그리고 영역을 모양으로 구분한다. */
 var EXSEC = {
-  gsat: [ {s:"수리", n:20, min:30}, {s:"추리", n:30, min:30} ],
-  skct: [ {s:"언어이해", n:20, min:15}, {s:"자료해석", n:20, min:15},
-          {s:"창의수리", n:20, min:15}, {s:"언어추리", n:20, min:15},
-          {s:"수열추리", n:20, min:15} ]
+  gsat: [ {s:"수리", n:20, min:30, mk:"dot", c:"var(--t2)"},
+          {s:"추리", n:30, min:30, mk:"tri", c:"var(--accent)"} ],
+  skct: [ {s:"언어이해", n:20, min:15, mk:"dot",  c:"var(--t2)"},
+          {s:"자료해석", n:20, min:15, mk:"tri",  c:"var(--accent)"},
+          {s:"창의수리", n:20, min:15, mk:"sq",   c:"var(--good)"},
+          {s:"언어추리", n:20, min:15, mk:"dia",  c:"var(--cs3)"},
+          {s:"수열추리", n:20, min:15, mk:"plus", c:"var(--cs5)"} ]
 };
 var aptMode = "prac";                 /* prac | exam */
-var exdraft = { sec:null, run:null };   /* run=null 이면 자동, 숫자면 그 회차로 넣는다 */
+var exdraft = { sec:null, run:null };  /* run=null 이면 자동, 숫자면 그 회차로 넣는다 */
 var exEditId = null, aEditId = null;   /* 기록 한 줄을 그 자리에서 고친다 */
 
 function exSecOf(ex, name){
   var f = EXSEC[ex].filter(function(x){ return x.s === name; });
   return f.length ? f[0] : null;
 }
-function exRecs(ex){
+function exRecs(ex, sec){
   var rs = (S.aptex || []).slice();
-  if (ex) rs = rs.filter(function(r){ return r.exam === ex; });
-  rs.sort(function(a,b){ return a.ds < b.ds ? -1 : (a.ds > b.ds ? 1 : (a.id < b.id ? -1 : 1)); });
+  if (ex)  rs = rs.filter(function(r){ return r.exam === ex; });
+  if (sec) rs = rs.filter(function(r){ return r.sec === sec; });
+  rs.sort(function(a,b){
+    var ar = a.run||1, br = b.run||1;
+    if (ar !== br) return ar - br;
+    return a.ds < b.ds ? -1 : (a.ds > b.ds ? 1 : (a.id < b.id ? -1 : 1));
+  });
   return rs;
 }
-/* one sitting = one 회차. Not one date — two sittings can happen in a day, and
-   merging them would average away exactly the comparison worth seeing. A 회차
-   closes on its own when the day changes or when a section repeats; the form
-   also has a button to start one by hand. */
-function exSittings(ex){
-  var m = {}, order = [];
-  exRecs(ex).forEach(function(r){
-    var run = r.run || 1;
-    var k = r.exam + "|" + run;
-    if (!m[k]){ m[k] = { run:run, ds:r.ds, exam:r.exam, ok:0, wr:0, sk:0, tot:0, n:0 }; order.push(k); }
-    var sc = exSecOf(r.exam, r.sec);
-    m[k].ok += r.ok; m[k].wr += r.wr; m[k].sk += r.sk;
-    m[k].tot += sc ? sc.n : (r.ok + r.wr + r.sk);
-    m[k].n++;
-    if (r.ds > m[k].ds) m[k].ds = r.ds;
-  });
-  order.sort(function(a,b){ return (+a.split("|")[1]) - (+b.split("|")[1]); });
-  return order.map(function(k){ return m[k]; });
+/* the next 회차 for one section — its own count, nobody else's */
+function exNextRun(ex, sec){
+  if (!sec) return 1;
+  var rs = exRecs(ex, sec), top = 0;
+  rs.forEach(function(r){ if ((r.run||1) > top) top = r.run||1; });
+  return top + 1;
 }
-/* Which 회차 the next record lands in. One 회차 = one full run of the exam, so
-   it stays open until every section is in it and then the next one opens by
-   itself. No dates involved — splitting 수리 and 추리 across two evenings is
-   still one 회차. */
-function exRunOpen(ex){
-  var rs = exRecs(ex);
-  if (!rs.length) return { run:1, missing:EXSEC[ex].map(function(x){ return x.s; }) };
-  var lastRun = 1;
-  rs.forEach(function(r){ if ((r.run||1) > lastRun) lastRun = r.run||1; });
-  var inRun = rs.filter(function(r){ return (r.run||1) === lastRun; });
-  var missing = EXSEC[ex].filter(function(sc){
-    return !inRun.some(function(r){ return r.sec === sc.s; });
-  }).map(function(sc){ return sc.s; });
-  if (!missing.length) return { run:lastRun+1, missing:EXSEC[ex].map(function(x){ return x.s; }) };
-  return { run:lastRun, missing:missing };
+function exMaxRun(ex){
+  var top = 1;
+  exRecs(ex).forEach(function(r){ if ((r.run||1) > top) top = r.run||1; });
+  return top;
 }
-/* Deleting a whole 회차 leaves a hole — 1·2·4. This pulls everything back so the
-   numbers run 1..N again, which is what "3회차를 지웠으니 4회차가 3회차가 된다"
-   means. Only the labels move; no record's numbers are touched. */
+/* Deleting a 회차 leaves a hole — 수리 1·2·4. This pulls that section's numbers
+   back to 1..N. Sections are renumbered independently, so fixing 수리 never
+   moves 추리. */
 function exRenumber(ex){
-  var rs = exRecs(ex);
-  var runs = [];
-  rs.forEach(function(r){ var v = r.run||1; if (runs.indexOf(v) < 0) runs.push(v); });
-  runs.sort(function(a,b){ return a-b; });
   var moved = 0;
-  rs.forEach(function(r){
-    var to = runs.indexOf(r.run||1) + 1;
-    if ((r.run||1) !== to){ r.run = to; moved++; }
+  EXSEC[ex].forEach(function(sc){
+    var rs = exRecs(ex, sc.s), runs = [];
+    rs.forEach(function(r){ var v = r.run||1; if (runs.indexOf(v) < 0) runs.push(v); });
+    runs.sort(function(a,b){ return a-b; });
+    rs.forEach(function(r){
+      var to = runs.indexOf(r.run||1) + 1;
+      if ((r.run||1) !== to){ r.run = to; moved++; }
+    });
   });
-  return { moved:moved, runs:runs.length };
-}
-function exRunFor(ex, sec){
-  var o = exRunOpen(ex);
-  /* the same section twice means a new run started, whatever else is missing */
-  if (sec && o.missing.indexOf(sec) < 0) return o.run + 1;
-  return o.run;
+  return { moved:moved };
 }
 function exAcc(x){ var d = x.ok + x.wr; return d ? x.ok/d : null; }   /* 맞 / 푼 것 */
 function exReach(x){ return x.tot ? (x.ok + x.wr)/x.tot : null; }     /* 푼 양 */
 
-/* One small line chart. Deliberately plain: dots for what happened, a line
-   between them, no trend line — three sittings do not have a trend. */
-function lineChart(pts, o){
-  if (!pts.length) return "";
-  var W = 320, H = 116, pl = 26, pr = 10, ptop = 12, pb = 20;
-  var n = pts.length, max = o.max;
-  var X = function(i){ return pl + (n <= 1 ? (W-pl-pr)/2 : i*(W-pl-pr)/(n-1)); };
-  var Y = function(v){ return ptop + (1 - v/max) * (H-ptop-pb); };
-  var col = o.color || "var(--t2)";
+/* one marker, drawn at a point */
+function mark(kind, x, y, col){
+  var r = 3.4;
+  if (kind === "tri")
+    return '<polygon points="'+ x.toFixed(1) +','+ (y-r-.6).toFixed(1) +' '
+         + (x-r-.4).toFixed(1) +','+ (y+r).toFixed(1) +' '
+         + (x+r+.4).toFixed(1) +','+ (y+r).toFixed(1) +'" fill="'+col+'"/>';
+  if (kind === "sq")
+    return '<rect x="'+ (x-r).toFixed(1) +'" y="'+ (y-r).toFixed(1) +'" width="'+(r*2)
+         + '" height="'+(r*2)+'" fill="'+col+'"/>';
+  if (kind === "dia")
+    return '<polygon points="'+ x.toFixed(1) +','+ (y-r-.8).toFixed(1) +' '
+         + (x+r+.8).toFixed(1) +','+ y.toFixed(1) +' '
+         + x.toFixed(1) +','+ (y+r+.8).toFixed(1) +' '
+         + (x-r-.8).toFixed(1) +','+ y.toFixed(1) +'" fill="'+col+'"/>';
+  if (kind === "ring")
+    return '<circle cx="'+ x.toFixed(1) +'" cy="'+ y.toFixed(1) +'" r="'+(r-.4)
+         + '" fill="none" stroke="'+col+'" stroke-width="1.8"/>';
+  if (kind === "plus")
+    return '<path d="M'+ (x-r-.6).toFixed(1) +' '+ y.toFixed(1) +'h'+ ((r+.6)*2).toFixed(1)
+         + 'M'+ x.toFixed(1) +' '+ (y-r-.6).toFixed(1) +'v'+ ((r+.6)*2).toFixed(1)
+         + '" stroke="'+col+'" stroke-width="2.2" stroke-linecap="round"/>';
+  return '<circle cx="'+ x.toFixed(1) +'" cy="'+ y.toFixed(1) +'" r="'+r+'" fill="'+col+'"/>';
+}
+/* One chart, one series per section. x is the 회차 number itself — so 수리 3회차
+   and 추리 3회차 sit on the same tick even though they happened weeks apart. */
+function multiChart(series, o){
+  var live = series.filter(function(sr){ return sr.pts.length; });
+  if (!live.length) return "";
+  var W = 320, H = 122, pl = 26, pr = 12, ptop = 12, pb = 20;
+  var xMax = Math.max(2, o.xMax), yMax = o.yMax;
+  var X = function(v){ return pl + (v-1) * (W-pl-pr) / (xMax-1); };
+  var Y = function(v){ return ptop + (1 - v/yMax) * (H-ptop-pb); };
 
   var s = '<svg class="schart" viewBox="0 0 '+W+' '+H+'" role="img" aria-label="'+ o.aria +'">';
-  [0, max/2, max].forEach(function(v){
+  [0, yMax/2, yMax].forEach(function(v){
     s += '<line x1="'+pl+'" y1="'+Y(v).toFixed(1)+'" x2="'+(W-pr)+'" y2="'+Y(v).toFixed(1)+'" '
        + 'stroke="var(--line-soft)" stroke-width="1"/>'
        + '<text x="'+(pl-5)+'" y="'+(Y(v)+3.5).toFixed(1)+'" text-anchor="end" '
        + 'font-size="8" fill="var(--ink-3)">'+ o.tick(v) +'</text>';
   });
-  for (var k=0;k<n-1;k++){
-    s += '<line x1="'+X(k).toFixed(1)+'" y1="'+Y(pts[k].v).toFixed(1)+'" '
-       + 'x2="'+X(k+1).toFixed(1)+'" y2="'+Y(pts[k+1].v).toFixed(1)+'" '
-       + 'stroke="'+col+'" stroke-width="1.8" stroke-linecap="round"/>';
+  /* 회차 ticks along the bottom, thinned out so they stay readable */
+  var step = xMax <= 8 ? 1 : Math.ceil(xMax/8);
+  for (var t=1; t<=xMax; t+=step){
+    s += '<text x="'+X(t).toFixed(1)+'" y="'+(H-6)+'" text-anchor="middle" '
+       + 'font-size="8" fill="var(--ink-3)">'+ t +'</text>';
   }
-  pts.forEach(function(p,i){
-    s += '<circle cx="'+X(i).toFixed(1)+'" cy="'+Y(p.v).toFixed(1)+'" r="3.2" fill="'+col+'"/>';
+  live.forEach(function(sr){
+    for (var k=0;k<sr.pts.length-1;k++){
+      s += '<line x1="'+X(sr.pts[k].x).toFixed(1)+'" y1="'+Y(sr.pts[k].v).toFixed(1)+'" '
+         + 'x2="'+X(sr.pts[k+1].x).toFixed(1)+'" y2="'+Y(sr.pts[k+1].v).toFixed(1)+'" '
+         + 'stroke="'+sr.color+'" stroke-width="1.6" stroke-linecap="round" opacity=".75"/>';
+    }
+    sr.pts.forEach(function(p){ s += mark(sr.mk, X(p.x), Y(p.v), sr.color); });
   });
-  /* label the ends only — a phone-width axis can't hold more without lying */
-  var lab = function(i){
-    return '<text x="'+X(i).toFixed(1)+'" y="'+(H-6)+'" text-anchor="middle" '
-         + 'font-size="8" fill="var(--ink-3)">'+ pts[i].lab +'</text>';
-  };
-  s += lab(0);
-  if (n > 1) s += lab(n-1);
-  /* the newest value, spelled out */
-  var last = pts[n-1];
-  s += '<text x="'+(W-pr)+'" y="'+Math.max(9, Y(last.v)-7).toFixed(1)+'" text-anchor="end" '
-     + 'font-size="9" font-weight="700" fill="'+col+'">'+ o.fmt(last.v) +'</text>';
   s += '</svg>';
   return s;
+}
+function chartLegend(ex, series){
+  var lg = '<div class="legend">';
+  series.forEach(function(sr){
+    var n = sr.pts.length;
+    lg += '<span class="lgi'+(n?'':' off')+'">'
+        + '<svg viewBox="0 0 12 12" aria-hidden="true">'+ mark(sr.mk, 6, 6, sr.color) +'</svg>'
+        + esc(sr.name) +'<i>'+ n +'회</i></span>';
+  });
+  return lg + '</div>';
 }
 
 function viewAptExam(){
   var ex = adraft.exam, secs = EXSEC[ex];
   if (!exdraft.sec || !exSecOf(ex, exdraft.sec)) exdraft.sec = null;
   var cur = exdraft.sec ? exSecOf(ex, exdraft.sec) : null;
-  var recs = exRecs(ex), sits = exSittings(ex);
+  var recs = exRecs(ex);
 
   /* ── 기록하기 ── */
   var h = '<div class="card"><h2>시험 기록</h2>';
   h += '<div class="secintro">제한시간 걸고 <b>영역 하나를 통째로</b> 푼 날 여기에 적어. '
-     + '연습이랑 따로 쌓여 — 재는 게 다르니까.</div>';
+     + '연습이랑 따로 쌓이고, <b>회차는 영역마다 따로</b> 세.</div>';
   h += '<div class="seg" style="margin-top:12px">'
      + ["gsat","skct"].map(function(k){
          return '<button data-act="aexam" data-x="'+k+'" aria-pressed="'+(ex===k)+'">'+ APT[k].nm +'</button>';
@@ -2781,8 +2806,9 @@ function viewAptExam(){
      + '</div>';
   h += '<div class="tglab">영역</div><div class="tchips">'
      + secs.map(function(x){
+         var done = exRecs(ex, x.s).length;
          return '<button data-act="exsec" data-t="'+ esc(x.s) +'" aria-pressed="'+(exdraft.sec===x.s)+'">'
-              + esc(x.s) +' <em>'+ x.n +'문항 '+ x.min +'분</em></button>';
+              + esc(x.s) +' <em>'+ (done ? done + '회 봄' : x.n + '문항 ' + x.min + '분') +'</em></button>';
        }).join("")
      + '</div>';
 
@@ -2796,27 +2822,23 @@ function viewAptExam(){
             + '<b>못 푼</b> 칸은 비워두면 나머지로 자동으로 채워.'
            : '영역을 먼저 골라줘. 영역마다 총 문항 수가 달라.')
      + '</div>';
-  var ro = exRunOpen(ex);
-  var autoRun = exRunFor(ex, exdraft.sec);
+
+  var autoRun = exNextRun(ex, exdraft.sec);
   var manual = exdraft.run !== null;
   var willRun = manual ? exdraft.run : autoRun;
   var restMsg;
-  if (manual){
-    var already = recs.filter(function(r){ return (r.run||1) === willRun; });
-    restMsg = already.length
-      ? willRun + '회차에 지금 ' + already.map(function(r){ return esc(r.sec); }).join("·") + ' 이 있어'
-      : willRun + '회차는 지금 비어 있어 — 지웠던 회차를 다시 채우는 거라면 여기가 맞아';
-  } else if (willRun !== ro.run){
-    restMsg = esc(exdraft.sec) + '는 ' + ro.run + '회차에 이미 있어서 다음 회차로 넘어가';
-  } else if (ro.missing.length === EXSEC[ex].length){
-    restMsg = '이 회차의 시작 · ' + EXSEC[ex].map(function(x){ return x.s; }).join("·") + ' 다 채우면 다음 회차로 넘어가';
+  if (!exdraft.sec){
+    restMsg = '영역을 고르면 그 영역의 다음 회차가 잡혀';
+  } else if (manual){
+    var taken = exRecs(ex, exdraft.sec).filter(function(r){ return (r.run||1) === willRun; });
+    restMsg = taken.length
+      ? esc(exdraft.sec) +' '+ willRun +'회차는 이미 있어 — 저장하면 같은 번호가 둘이 돼'
+      : esc(exdraft.sec) +' '+ willRun +'회차는 비어 있어 · 지웠던 회차를 다시 채우는 거라면 여기가 맞아';
   } else {
-    restMsg = '이 회차에 남은 영역 — ' + ro.missing.map(esc).join(" · ");
+    restMsg = esc(exdraft.sec) +'만 세서 '+ willRun +'번째야 · 다른 영역은 각자 따로 세';
   }
-  /* Normally the app works the 회차 out on its own, but a record deleted by
-     mistake has to be able to go back where it was — so the number is a field,
-     not a readout. */
-  h += '<div class="runrow"><div class="rl">이 기록은'
+  h += '<div class="runrow"><div class="rl">'
+     + (exdraft.sec ? esc(exdraft.sec) : '이 기록은')
      + '<input type="number" class="runin" id="exrun" inputmode="numeric" min="1" max="999" value="'+ willRun +'">'
      + '회차<s>'+ restMsg +'</s></div>'
      + (manual ? '<button class="hbtn" data-act="exrunauto">자동으로</button>' : '')
@@ -2825,41 +2847,55 @@ function viewAptExam(){
   h += '</div>';
 
   /* ── 그래프 ── */
-  h += '<div class="card"><h2>추이<em>'+ APT[ex].nm +' · 회차별</em></h2>';
-  if (!sits.length){
-    h += aneed("시험을 한 번 적으면 여기에 점이 하나 찍혀. 두 번째부터 선이 생겨.");
+  h += '<div class="card"><h2>추이<em>'+ APT[ex].nm +' · 영역별 회차</em></h2>';
+  if (!recs.length){
+    h += aneed("시험을 한 번 적으면 여기에 점이 하나 찍혀. 같은 영역을 두 번째 볼 때부터 선이 생겨.");
   } else {
-    h += '<div class="secintro">가로축은 <b>회차</b>야. '
-       + APT[ex].nm +'는 '+ EXSEC[ex].map(function(x){ return x.s; }).join("·")
-       + ' 를 다 채우면 한 회차. 하루에 두 번 봤으면 <b>따로 찍혀</b>. '
-       + '지금까지 '+ sits.length +'회차 · 마지막 '+ md(parseISO(sits[sits.length-1].ds)) +'.</div>';
-    var labOf = function(x){ return x.run + "회"; };
-
-    var accPts = sits.filter(function(x){ return exAcc(x) !== null; })
-                     .map(function(x){ return { lab:labOf(x), v:exAcc(x)*100 }; });
-    var rchPts = sits.filter(function(x){ return exReach(x) !== null; })
-                     .map(function(x){ return { lab:labOf(x), v:exReach(x)*100 }; });
-    var maxTot = Math.max.apply(null, sits.map(function(x){ return x.tot; }));
-    var okPts  = sits.map(function(x){ return { lab:labOf(x), v:x.ok }; });
-
+    var xMax = exMaxRun(ex);
+    /* per-section series, plus 전체 — the sections sitting on the same 회차
+       number added together. At a 회차 where only one section exists, 전체 is
+       that one section; it is a running total of what you actually sat. */
+    var mk = function(val){
+      var out = secs.map(function(sc){
+        return { name:sc.s, mk:sc.mk, color:sc.c,
+                 pts: exRecs(ex, sc.s).map(function(r){
+                        return { x:(r.run||1), v:val(r, sc.n) };
+                      }).filter(function(p){ return p.v !== null; }) };
+      });
+      var byRun = {};
+      exRecs(ex).forEach(function(r){
+        var k = r.run||1, sc = exSecOf(ex, r.sec);
+        if (!byRun[k]) byRun[k] = { ok:0, wr:0, sk:0, tot:0 };
+        byRun[k].ok += r.ok; byRun[k].wr += r.wr; byRun[k].sk += r.sk;
+        byRun[k].tot += sc ? sc.n : (r.ok+r.wr+r.sk);
+      });
+      var tp = Object.keys(byRun).map(Number).sort(function(a,b){ return a-b; })
+        .map(function(k){ return { x:k, v:val(byRun[k], byRun[k].tot) }; })
+        .filter(function(p){ return p.v !== null; });
+      out.push({ name:"전체", mk:"ring", color:"var(--ink-2)", pts:tp, all:true });
+      return out;
+    };
+    var accS = mk(function(r){ return exAcc(r) === null ? null : exAcc(r)*100; });
+    var rchS = mk(function(r, tot){ return (r.ok + r.wr) / tot * 100; });
+    var okS  = mk(function(r){ return r.ok; });
+    var allN = secs.reduce(function(a,sc){ return a + sc.n; }, 0);
     var pctTick = function(v){ return Math.round(v) + ""; };
     var pctFmt  = function(v){ return Math.round(v) + "%"; };
 
-    h += '<div class="chead"><span>정답률<i>맞은 / 푼 것</i></span><b>'
-       + (accPts.length ? pctFmt(accPts[accPts.length-1].v) : "—") +'</b></div>';
-    h += lineChart(accPts, {max:100, tick:pctTick, fmt:pctFmt, color:"var(--good)",
-                            aria:"회차별 정답률"});
+    h += '<div class="secintro">가로축은 <b>그 영역의 회차</b>야. '
+       + '수리 3번·추리 1번 봤으면 수리는 3회차까지, 추리는 1회차에 찍혀 — 영역마다 진도가 따로 흐르니까. '
+       + '<b>전체</b>는 같은 회차 번호의 영역들을 합친 값이야. 모양으로 구분해.</div>';
+    h += chartLegend(ex, accS);
 
-    h += '<div class="chead"><span>푼 양<i>못 푼 문항을 뺀 비율</i></span><b>'
-       + (rchPts.length ? pctFmt(rchPts[rchPts.length-1].v) : "—") +'</b></div>';
-    h += lineChart(rchPts, {max:100, tick:pctTick, fmt:pctFmt, color:"var(--t2)",
-                            aria:"회차별 푼 양"});
+    h += '<div class="chead"><span>정답률<i>맞은 / 푼 것</i></span></div>';
+    h += multiChart(accS, {xMax:xMax, yMax:100, tick:pctTick, aria:"영역별 회차 정답률"});
 
-    h += '<div class="chead"><span>맞은 개수<i>회차 전체</i></span><b>'
-       + okPts[okPts.length-1].v +'개</b></div>';
-    h += lineChart(okPts, {max:Math.max(5, maxTot), tick:function(v){ return Math.round(v)+""; },
-                           fmt:function(v){ return Math.round(v)+"개"; },
-                           color:"var(--accent)", aria:"회차별 맞은 개수"});
+    h += '<div class="chead"><span>푼 양<i>못 푼 문항을 뺀 비율</i></span></div>';
+    h += multiChart(rchS, {xMax:xMax, yMax:100, tick:pctTick, aria:"영역별 회차 푼 양"});
+
+    h += '<div class="chead"><span>맞은 개수<i>영역 문항 기준</i></span></div>';
+    h += multiChart(okS, {xMax:xMax, yMax:Math.max(5, allN),
+                          tick:function(v){ return Math.round(v)+""; }, aria:"영역별 회차 맞은 개수"});
 
     h += '<div class="cnote">정답률은 <b>고른 것 중 얼마나 맞았나</b>, 푼 양은 '
        + '<b>시간 안에 어디까지 갔나</b>야. 둘이 같이 안 움직이는 게 정상이고, '
@@ -2874,16 +2910,16 @@ function viewAptExam(){
   } else {
     h += atrust(recs.length, 10, "시험 기록");
     var rows = secs.map(function(sc){
-      var inS = recs.filter(function(r){ return r.sec === sc.s; });
+      var inS = exRecs(ex, sc.s);
       var agg = { ok:0, wr:0, sk:0, tot:0 };
       inS.forEach(function(r){ agg.ok+=r.ok; agg.wr+=r.wr; agg.sk+=r.sk; agg.tot+=sc.n; });
-      return { s:sc.s, n:inS.length, acc:exAcc(agg), reach:exReach(agg), ok:agg.ok };
+      return { s:sc.s, n:inS.length, acc:exAcc(agg), reach:exReach(agg) };
     }).filter(function(r){ return r.n > 0; });
     rows.sort(function(a,b){ return a.acc - b.acc; });
 
     h += '<div class="btable">';
     rows.forEach(function(r){
-      h += '<div class="brow"><div class="bl">'+ esc(r.s) +'<s>'+ r.n +'회</s></div>'
+      h += '<div class="brow"><div class="bl">'+ esc(r.s) +'<s>'+ r.n +'회차까지</s></div>'
          + '<div class="bv">'
          +   '<div class="bcell"><span>정답률</span><u>'+ pctText(r.acc) +'</u>'+ bar(r.acc, "good") +'</div>'
          +   '<div class="bcell"><span>푼 양</span><u>'+ pctText(r.reach) +'</u>'+ bar(r.reach, "acc") +'</div>'
@@ -2899,20 +2935,19 @@ function viewAptExam(){
      + '</h2>';
   if (recs.length){
     h += '<div class="studyhint" style="text-align:left;margin:-4px 0 10px">'
-       + '✎ 로 회차를 직접 고칠 수 있어. 3회차를 통째로 지웠다면 <b>회차 정리</b>를 누르면 '
-       + '뒤의 회차들이 하나씩 당겨져.</div>';
+       + '✎ 로 회차·날짜·숫자를 고칠 수 있어. 수리 3회차를 지웠다면 <b>회차 정리</b>가 '
+       + '수리만 1·2·3으로 당겨줘 — 추리는 안 건드려.</div>';
   }
   if (!recs.length){
     h += '<div class="empty">아직 '+ APT[ex].nm +' 시험 기록이 없어.</div>';
   } else {
     h += '<div class="list">';
-    recs.slice(-12).reverse().forEach(function(r){
+    recs.slice().reverse().slice(0,14).forEach(function(r){
       var sc = exSecOf(r.exam, r.sec), tot = sc ? sc.n : (r.ok+r.wr+r.sk);
-      var a = exAcc(r);
       if (r.id === exEditId){
         h += '<div class="apedit">'
            + '<div class="ael">'+ md(parseISO(r.ds)) +' · <b>'+ esc(r.sec) +'</b>'
-           +   '<s>세 칸의 합이 '+ tot +'이 돼야 해 · 회차는 직접 바꿔도 돼</s></div>'
+           +   '<s>세 칸의 합이 '+ tot +'이 돼야 해 · 회차는 이 영역 안에서의 번호야</s></div>'
            + '<div class="numgrid three">'
            +   '<label>맞은<input type="number" id="exeok" inputmode="numeric" min="0" max="99" value="'+ r.ok +'"></label>'
            +   '<label>틀린<input type="number" id="exewr" inputmode="numeric" min="0" max="99" value="'+ r.wr +'"></label>'
@@ -2931,7 +2966,7 @@ function viewAptExam(){
       h += '<div class="aprow">'
          + '<div class="ad">'+ (r.run||1) +'회<s>'+ md(parseISO(r.ds)) +'</s></div>'
          + '<div class="at">'+ esc(r.sec) +'<s>맞 '+ r.ok +' · 틀 '+ r.wr +' · 못 '+ r.sk +' / '+ tot +'</s></div>'
-         + '<div class="ar">'+ pctText(a) +'<s>푼 양 '+ pctText(exReach({ok:r.ok,wr:r.wr,tot:tot})) +'</s></div>'
+         + '<div class="ar">'+ pctText(exAcc(r)) +'<s>푼 양 '+ pctText(exReach({ok:r.ok,wr:r.wr,tot:tot})) +'</s></div>'
          + '<button class="adel" data-act="exedit" data-id="'+ r.id +'" aria-label="고치기">✎</button>'
          + '<button class="adel" data-act="exdel" data-id="'+ r.id +'" aria-label="지우기">×</button>'
          + '</div>';
@@ -4113,7 +4148,7 @@ function doAct(act, n){
     }
     var xid = 1;
     (S.aptex || []).forEach(function(r){ var k = +String(r.id).slice(1) || 0; if (k >= xid) xid = k+1; });
-    var xrun = exdraft.run !== null ? exdraft.run : exRunFor(adraft.exam, exdraft.sec);
+    var xrun = exdraft.run !== null ? exdraft.run : exNextRun(adraft.exam, exdraft.sec);
     S.aptex.push({ id:"x"+xid, ds:iso(today()), exam:adraft.exam, sec:exdraft.sec,
                    ok:xok, wr:xwr, sk:xsk, run:xrun });
     exdraft.run = null;                     /* 한 건 넣고 나면 다시 자동으로 */
