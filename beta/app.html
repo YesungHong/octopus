@@ -112,12 +112,12 @@ button,.row,.chip,.tabs button,.condpick button,.seg button,.dowpick button{
 .mast .per{font-family:var(--font-num);font-size:12px;color:var(--ink-3);font-variant-numeric:tabular-nums}
 
 /* ── tabs ─────────────────────────────────────────────────────── */
-.tabs{display:grid;grid-template-columns:repeat(4,1fr);gap:2px;background:var(--sunk);
+.tabs{display:grid;grid-template-columns:repeat(5,1fr);gap:2px;background:var(--sunk);
   padding:3px;border-radius:9px;margin-bottom:18px}
 .tabs button{
   appearance:none;border:0;background:transparent;color:var(--ink-3);
-  font-family:inherit;font-size:13.5px;font-weight:600;letter-spacing:.02em;
-  padding:8px 4px;border-radius:7px;cursor:pointer;transition:background .15s,color .15s;
+  font-family:inherit;font-size:12.5px;font-weight:600;letter-spacing:0;
+  padding:8px 2px;border-radius:7px;cursor:pointer;transition:background .15s,color .15s;
 }
 .tabs button[aria-selected="true"]{background:var(--surface);color:var(--ink);box-shadow:var(--shadow)}
 .tabs button:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
@@ -616,6 +616,33 @@ img.pix{image-rendering:pixelated}
   padding:7px 9px;border-radius:9px;border:1px solid var(--line);
   background:var(--surface);color:var(--ink);font:inherit;font-size:11px;cursor:pointer}
 .mpick img{width:40px;height:40px;object-fit:contain}
+/* ── 인적성 (취준 기록판) ───────────────────────────────────── */
+.tglab{font-size:10.5px;letter-spacing:.08em;color:var(--ink-3);margin:14px 0 6px;font-weight:600}
+.tchips{display:flex;flex-wrap:wrap;gap:5px}
+.tchips button{appearance:none;border:1px solid var(--line);background:var(--bg);color:var(--ink-2);
+  font:inherit;font-size:12.5px;padding:7px 11px;border-radius:999px;cursor:pointer;
+  touch-action:manipulation}
+.tchips button[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);
+  color:var(--bg);font-weight:600}
+.tchips button:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.numgrid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:14px}
+.numgrid label{display:flex;flex-direction:column;gap:5px;font-size:11px;color:var(--ink-3)}
+.numgrid input{width:100%;background:var(--bg);border:1px solid var(--line);border-radius:9px;
+  color:var(--ink);font-family:var(--font-num);font-size:16px;font-variant-numeric:tabular-nums;
+  padding:11px 12px;text-align:center}
+.numgrid input:focus{outline:0;border-color:var(--accent)}
+.aprow{display:flex;align-items:center;gap:9px;padding:9px 6px;border-bottom:1px solid var(--line-soft)}
+.aprow:last-child{border-bottom:0}
+.aprow .ad{font-family:var(--font-num);font-size:11px;color:var(--ink-3);width:36px;flex:none;
+  font-variant-numeric:tabular-nums}
+.aprow .at{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px}
+.aprow .at s{display:block;text-decoration:none;font-size:10.5px;color:var(--ink-3)}
+.aprow .ar{font-family:var(--font-num);font-size:15px;font-variant-numeric:tabular-nums;flex:none;
+  text-align:right;min-width:52px}
+.aprow .ar s{display:block;text-decoration:none;font-size:10.5px;color:var(--ink-3)}
+.adel{appearance:none;border:0;background:transparent;color:var(--ink-3);font:inherit;
+  font-size:15px;line-height:1;padding:6px 2px;cursor:pointer;flex:none;opacity:.55}
+.adel:hover,.adel:focus-visible{opacity:1;color:var(--accent-ink)}
 .betabadge{display:inline-block;vertical-align:middle;margin-left:7px;
   padding:2px 7px;border-radius:6px;border:1px solid var(--accent);
   background:var(--accent-soft);color:var(--accent-ink);
@@ -635,6 +662,7 @@ img.pix{image-rendering:pixelated}
     <button role="tab" data-v="day"  aria-selected="true">일간</button>
     <button role="tab" data-v="week" aria-selected="false">주간</button>
     <button role="tab" data-v="all"  aria-selected="false">전체</button>
+    <button role="tab" data-v="apt"  aria-selected="false">인적성</button>
   </div>
 
   <div id="view"></div>
@@ -1231,6 +1259,7 @@ function blank(){
     seenWeek: null,
     lastBackup: null,
     backupAsked: null,          /* "YYYY-MM" — 이 달의 백업 물음에 이미 답했다 */
+    aptit: [],                   /* 인적성 기록 — pt와 완전히 분리 */
     gacha: { used:0, dex:{}, hold:{}, last:null },
     pet: true,                   /* 모은 캐릭터가 화면 아래를 돌아다닌다 */
     petPick: null                /* {k,id} — 산책할 애는 직접 고른다 */
@@ -1483,6 +1512,7 @@ function render(){
   if (view === "day")  v.innerHTML = top + viewDay(cursorDay());
   if (view === "week") v.innerHTML = top + viewWeek(cursorWeek());
   if (view === "all")  v.innerHTML = top + viewAll();
+  if (view === "apt")  v.innerHTML = top + viewApt();
   wire();
 }
 
@@ -2507,6 +2537,341 @@ function gachaCard(){
   return h;
 }
 
+/* ───────── 인적성 (GSAT · SKCT) ─────────
+   취준용 기록판. pt·주간목표·뽑기권 어디에도 들어가지 않는다 — 문항 수가 점수가
+   되면 "많이 푸는 것"이 이기는 수가 되고, 정답률을 버리게 되기 때문. 여기서
+   나오는 값은 기록과 해석뿐이다. 일간의 공부 시간과도 별개로 잰다. */
+var APT = {
+  gsat: { nm:"GSAT", groups:[
+    { g:"수리", ts:["응용수리","자료해석"] },
+    { g:"추리", ts:["명제","추리퀴즈","도형추리","도식추리","단어유추","논리추론"] } ] },
+  skct: { nm:"SKCT", groups:[
+    { g:"유형", ts:["언어이해","자료해석","창의수리","언어추리","수열추리"] } ] }
+};
+var TOD  = { am:"오전", pm:"오후", eve:"저녁" };
+var TODK = ["am","pm","eve"];
+function todNow(){ var h = new Date().getHours(); return h < 12 ? "am" : (h < 18 ? "pm" : "eve"); }
+function aptTypes(ex){
+  var o = [];
+  APT[ex].groups.forEach(function(gr){ gr.ts.forEach(function(t){ o.push(t); }); });
+  return o;
+}
+var adraft = { exam:"gsat", type:null, tod:null };
+
+function aptRecs(ex){
+  var rs = (S.aptit || []).slice();
+  if (ex) rs = rs.filter(function(r){ return r.exam === ex; });
+  rs.sort(function(a,b){ return a.ds < b.ds ? -1 : (a.ds > b.ds ? 1 : (a.id < b.id ? -1 : 1)); });
+  return rs;
+}
+/* weighted by items, not by set — a 20-item set says more than a 5-item one */
+function accOf(rs){
+  var n = 0, k = 0;
+  rs.forEach(function(r){ n += r.n; k += r.ok; });
+  return n ? k / n : null;
+}
+/* seconds per item, counting only sets whose time was actually recorded */
+function paceOf(rs){
+  var n = 0, s = 0;
+  rs.forEach(function(r){ if (r.sec > 0){ n += r.n; s += r.sec; } });
+  return n ? s / n : null;
+}
+function secText(s){
+  if (s === null) return "—";
+  s = Math.round(s);
+  return s < 60 ? s + "초" : Math.floor(s/60) + "분 " + (s%60) + "초";
+}
+function pctText(a){ return a === null ? "—" : Math.round(a*100) + "%"; }
+function aptDays(){
+  var m = {};
+  (S.aptit || []).forEach(function(r){ m[r.ds] = 1; });
+  return m;
+}
+/* thin samples are labelled, never hidden — same rule as 내 패턴 */
+function atrust(n, strong, what){
+  if (n >= strong) return "";
+  return '<div class="caution">데이터가 적어 믿을 만한 수준은 아니에요. 참고만 하세요.'
+       + '<s>'+ what +' '+ n +'건 · '+ strong +'건쯤부터 안정적이야</s></div>';
+}
+function aneed(txt){ return '<div class="need">'+ txt +'</div>'; }
+
+function viewApt(){
+  if (!adraft.tod) adraft.tod = todNow();
+  var ex = adraft.exam, all = aptRecs(), recs = aptRecs(ex);
+
+  /* ── 기록하기 ── */
+  var h = '<div class="card"><h2>기록하기</h2>';
+  h += '<div class="secintro">한 세트 풀고 <b>몇 문제 · 몇 개 맞음 · 걸린 시간</b>만 적어. '
+     + 'pt나 뽑기권에는 안 들어가 — 여기는 순수한 기록판이야.</div>';
+  h += '<div class="seg" style="margin-top:12px">'
+     + ["gsat","skct"].map(function(k){
+         return '<button data-act="aexam" data-x="'+k+'" aria-pressed="'+(ex===k)+'">'+ APT[k].nm +'</button>';
+       }).join("")
+     + '</div>';
+
+  APT[ex].groups.forEach(function(gr){
+    h += '<div class="tglab">'+ gr.g +'</div><div class="tchips">'
+       + gr.ts.map(function(t){
+           return '<button data-act="atype" data-t="'+ esc(t) +'" aria-pressed="'
+                + (adraft.type === t) +'">'+ esc(t) +'</button>';
+         }).join("")
+       + '</div>';
+  });
+
+  h += '<div class="tglab">언제 풀었어</div><div class="seg">'
+     + TODK.map(function(k){
+         return '<button data-act="atod" data-x="'+k+'" aria-pressed="'+(adraft.tod===k)+'">'+ TOD[k] +'</button>';
+       }).join("")
+     + '</div>';
+
+  h += '<div class="numgrid">'
+     + '<label>푼 문항<input type="number" id="an" inputmode="numeric" min="1" max="200" placeholder="10"></label>'
+     + '<label>맞은 개수<input type="number" id="aok" inputmode="numeric" min="0" max="200" placeholder="7"></label>'
+     + '<label>걸린 시간 (분)<input type="number" id="amin" inputmode="numeric" min="0" max="600" placeholder="12"></label>'
+     + '<label>초<input type="number" id="asec" inputmode="numeric" min="0" max="59" placeholder="0"></label>'
+     + '</div>';
+  h += '<button class="addbtn" data-act="aadd" style="width:100%;margin-top:12px">기록 추가</button>';
+  h += '<div class="studyhint" style="text-align:left">시간은 비워둬도 돼. 적으면 문항당 속도까지 같이 봐줄게.</div>';
+  h += '</div>';
+
+  /* ── 최근 기록 ── */
+  h += '<div class="card"><h2>최근 기록<em>'+ APT[ex].nm +'</em></h2>';
+  if (!recs.length){
+    h += '<div class="empty">아직 '+ APT[ex].nm +' 기록이 없어.<br>한 세트 풀고 위에 적어봐.</div>';
+  } else {
+    var last = recs.slice(-12).reverse();
+    h += '<div class="list">';
+    last.forEach(function(r){
+      var d = parseISO(r.ds);
+      h += '<div class="aprow">'
+         + '<div class="ad">'+ md(d) +'</div>'
+         + '<div class="at">'+ esc(r.type) +'<s>'+ TOD[r.tod] +' · '+ r.ok +'/'+ r.n +'문항'
+         +   (r.sec > 0 ? ' · '+ secText(r.sec) : '') +'</s></div>'
+         + '<div class="ar">'+ Math.round(r.ok/r.n*100) +'%'
+         +   (r.sec > 0 ? '<s>문항당 '+ secText(r.sec/r.n) +'</s>' : '') +'</div>'
+         + '<button class="adel" data-act="adel" data-id="'+ r.id +'" aria-label="지우기">×</button>'
+         + '</div>';
+    });
+    h += '</div>';
+    var tot = accOf(recs);
+    h += '<div class="drep" style="margin-top:14px">'
+       + drow("전체 정답률", pctText(tot), tot !== null && tot >= 0.7 ? "good" : "")
+       + drow("푼 문항", recs.reduce(function(a,r){ return a+r.n; },0) + "문항 · " + recs.length + "세트", "")
+       + drow("문항당 시간", secText(paceOf(recs)), "")
+       + '</div>';
+  }
+  h += '</div>';
+
+  /* ── 유형별 성적표 ── */
+  h += '<div class="card"><h2>유형별<em>'+ APT[ex].nm +'</em></h2>';
+  if (!recs.length){
+    h += aneed("기록이 하나라도 생기면 여기부터 채워져.");
+  } else {
+    h += atrust(recs.length, 15, "기록");
+    var rows = aptTypes(ex).map(function(t){
+      var inT = recs.filter(function(r){ return r.type === t; });
+      return { t:t, n:inT.length, items:inT.reduce(function(a,r){ return a+r.n; },0),
+               acc:accOf(inT), pace:paceOf(inT) };
+    }).filter(function(r){ return r.n > 0; });
+    /* weakest first — the table is for finding where to aim, not for a ranking */
+    rows.sort(function(a,b){ return a.acc - b.acc; });
+
+    h += '<div class="btable">';
+    rows.forEach(function(r){
+      h += '<div class="brow"><div class="bl">'+ esc(r.t) +'<s>'+ r.items +'문항</s></div>'
+         + '<div class="bv">'
+         +   '<div class="bcell"><span>정답률</span><u>'+ pctText(r.acc) +'</u>'+ bar(r.acc, "good") +'</div>'
+         +   '<div class="bcell"><span>문항당</span><u>'+ secText(r.pace) +'</u></div>'
+         + '</div></div>';
+    });
+    h += '</div>';
+
+    var untouched = aptTypes(ex).filter(function(t){
+      return !recs.some(function(r){ return r.type === t; });
+    });
+    if (untouched.length){
+      h += '<div class="studyhint" style="text-align:left">아직 안 푼 유형: '
+         + untouched.map(esc).join(" · ") + '</div>';
+    }
+    if (rows.length >= 3){
+      var weak = rows[0];
+      h += '<div class="finding"><div class="fk">지금 제일 아쉬운 유형</div>'
+         + '<div class="fv">'+ esc(weak.t) +'</div>'
+         + '<div class="fs">정답률 '+ pctText(weak.acc) +' · '+ weak.items +'문항 기준</div></div>';
+    }
+  }
+  h += '</div>';
+
+  h += '<button class="jump" data-act="aptin">인적성 분석 <em>'+ all.length +'건</em></button>';
+  return h;
+}
+
+/* ── 인적성 분석 ──
+   두 가지만 묻는다: 매일 이어서 푸는 게 실제로 효과가 있나, 그리고 시간대에 따라
+   달라지나. 둘 다 "몇 점 올랐다"가 아니라 "너는 이런 타입이다"로 말한다 —
+   소수점 차이를 성적표처럼 읽게 만들지 않으려고. */
+function aptSplitStreak(){
+  var days = aptDays();
+  var cont = [], solo = [];
+  (S.aptit || []).forEach(function(r){
+    var prev = iso(addDays(parseISO(r.ds), -1));
+    (days[prev] ? cont : solo).push(r);
+  });
+  return { cont:cont, solo:solo };
+}
+function aptVerdict(kind, a, b, la, lb){
+  var gap = (a - b) * 100;                 /* percentage points */
+  var out = {};
+  if (kind === "streak"){
+    if (gap > 3){
+      out.cls = "ok";
+      out.t = "너는 <b>이어서 풀면 붙는 타입</b>이야. 전날도 푼 다음 날의 정답률이 더 높게 나와. "
+            + "매일 조금씩이 너한테는 실제로 통한다는 뜻이야 — 감이 아니라 네 기록이 그래.";
+    } else if (gap < -3){
+      out.cls = "";
+      out.t = "이어서 푼 날이 오히려 조금 낮게 나와. 매일이 나쁘다는 게 아니라, "
+            + "<b>연속으로 갈 때 피로가 같이 쌓이는</b> 걸 수도 있어. "
+            + "중간에 하루 비워도 손해 아니라는 얘기야.";
+    } else {
+      out.cls = "";
+      out.t = "이어서 풀든 하루 걸러 풀든 정답률이 비슷해. "
+            + "적어도 지금 기록에선 <b>연속 여부가 실력을 가르지 않아</b>. "
+            + "그러니까 하루 건너뛴 날에 죄책감 가질 이유는 없어.";
+    }
+  } else {                                  /* trend — a=최근 절반, b=처음 절반 */
+    if (gap > 3){
+      out.cls = "ok";
+      out.t = "최근 절반이 처음 절반보다 정답률이 높아. <b>올라가고 있어.</b> "
+            + "이런 건 하고 있는 중에는 절대 체감이 안 되는 종류라서, 숫자로 보라고 여기 둔 거야.";
+    } else if (gap < -3){
+      out.cls = "";
+      out.t = "최근 절반이 조금 낮게 나왔어. 보통은 <b>더 어려운 유형으로 넘어갔을 때</b> 이렇게 돼. "
+            + "유형별 표를 같이 보면 어디서 내려갔는지 보일 거야.";
+    } else {
+      out.cls = "";
+      out.t = "처음이나 지금이나 정답률이 비슷해. 아직 <b>변화가 보일 만큼 쌓이지 않은</b> 구간이야. "
+            + "인적성은 원래 한참 평평하다가 한 번에 올라가는 편이라 이상한 그림이 아니야.";
+    }
+  }
+  out.sub = la +' '+ pctText(a) +' vs '+ lb +' '+ pctText(b)
+          + ' · 차이 '+ Math.abs(gap).toFixed(0) +'%p';
+  return out;
+}
+function afind(v){
+  return '<div class="cnote'+(v.cls?' '+v.cls:'')+'">'+ v.t
+       + '<div class="fs" style="margin-top:7px">'+ v.sub +'</div></div>';
+}
+
+function viewAptIn(){
+  var all = aptRecs();
+  var items = all.reduce(function(a,r){ return a+r.n; }, 0);
+  var nDays = Object.keys(aptDays()).length;
+
+  var h = '<div class="card">';
+  h += '<div class="rep-h"><div class="t">인적성 분석</div>'
+     + '<div class="d">'+ all.length +'세트 · '+ items +'문항 · '+ nDays +'일</div></div>';
+  h += '<div class="note">🐙 전부 네 기록에서 나온 거야. 일반론이 아니라 <b>너한테</b> 어땠는지고, '
+     + '기록이 얇으면 얇다고 먼저 말할게.</div></div>';
+
+  /* 1 — 두 시험 나란히 */
+  h += '<div class="card"><h2>시험별</h2>';
+  if (!all.length){
+    h += aneed("아직 기록이 없어. 한 세트만 적어도 여기부터 살아나.");
+  } else {
+    h += '<div class="btable">';
+    ["gsat","skct"].forEach(function(k){
+      var rs = aptRecs(k);
+      if (!rs.length) return;
+      var a = accOf(rs);
+      h += '<div class="brow"><div class="bl">'+ APT[k].nm +'<s>'+ rs.length +'세트</s></div>'
+         + '<div class="bv">'
+         +   '<div class="bcell"><span>정답률</span><u>'+ pctText(a) +'</u>'+ bar(a, "good") +'</div>'
+         +   '<div class="bcell"><span>문항당</span><u>'+ secText(paceOf(rs)) +'</u></div>'
+         + '</div></div>';
+    });
+    h += '</div>';
+  }
+  h += '</div>';
+
+  /* 2 — 매일 하면 오르나 */
+  h += '<div class="card"><h2>매일 풀면 오를까</h2>';
+  h += '<div class="secintro">푼 날마다 <b>전날에도 풀었는지</b>를 보고 두 무리로 갈라. '
+     + '"매일 조금씩"이 너한테 실제로 먹히는지 확인하는 자리야.</div>';
+  var sp = aptSplitStreak();
+  if (sp.cont.length < 2 || sp.solo.length < 2){
+    h += aneed("아직 두 무리로 가를 만큼은 아니야. 이어서 푼 날과 걸러 푼 날이 각각 <b>2세트</b>씩 생기면 계산돼."
+             + "<br>지금 — 이어서 "+ sp.cont.length +"세트 · 걸러서 "+ sp.solo.length +"세트");
+  } else {
+    h += atrust(all.length, 20, "기록");
+    h += afind(aptVerdict("streak", accOf(sp.cont), accOf(sp.solo), "이어서", "걸러서"));
+  }
+  h += '</div>';
+
+  /* 3 — 시간대 */
+  h += '<div class="card"><h2>시간대에 따라</h2>';
+  h += '<div class="secintro">오전·오후·저녁 중 <b>언제 푼 게 잘 나왔는지</b>. '
+     + '잘 되는 시간대를 알면 그 자리에 어려운 유형을 놓을 수 있어.</div>';
+  var byTod = TODK.map(function(k){
+    var rs = all.filter(function(r){ return r.tod === k; });
+    return { k:k, n:rs.length, items:rs.reduce(function(a,r){ return a+r.n; },0),
+             acc:accOf(rs), pace:paceOf(rs) };
+  }).filter(function(x){ return x.n > 0; });
+
+  if (!byTod.length){
+    h += aneed("기록이 생기면 여기부터 채워져.");
+  } else {
+    h += atrust(all.length, 20, "기록");
+    h += '<div class="btable">';
+    byTod.forEach(function(x){
+      h += '<div class="brow"><div class="bl">'+ TOD[x.k] +'<s>'+ x.items +'문항</s></div>'
+         + '<div class="bv">'
+         +   '<div class="bcell"><span>정답률</span><u>'+ pctText(x.acc) +'</u>'+ bar(x.acc, "good") +'</div>'
+         +   '<div class="bcell"><span>문항당</span><u>'+ secText(x.pace) +'</u></div>'
+         + '</div></div>';
+    });
+    h += '</div>';
+
+    var solid = byTod.filter(function(x){ return x.n >= 2; });
+    if (solid.length >= 2){
+      var best = solid.slice().sort(function(a,b){ return b.acc - a.acc; })[0];
+      var worst = solid.slice().sort(function(a,b){ return a.acc - b.acc; })[0];
+      var d = (best.acc - worst.acc) * 100;
+      if (d > 4){
+        h += '<div class="finding"><div class="fk">네 기록상 제일 잘 맞는 시간대</div>'
+           + '<div class="fv">'+ TOD[best.k] +'</div>'
+           + '<div class="fs">정답률 '+ pctText(best.acc) +' · '+ TOD[worst.k] +'보다 '
+           + d.toFixed(0) +'%p 높음 · '+ best.items +'문항 기준</div></div>';
+        h += '<div class="cnote">어려운 유형은 '+ TOD[best.k] +'에 놓고, '
+           + TOD[worst.k] +'에는 가벼운 걸 두는 게 지금 기록에는 맞아. '
+           + '<b>시간대를 바꾸는 건 실력 얘기가 아니라 배치 얘기야.</b></div>';
+      } else {
+        h += '<div class="cnote">시간대별 차이가 크지 않아. <b>언제 푸는지는 너한테 큰 변수가 아니야</b> — '
+           + '그날 되는 시간에 풀면 돼.</div>';
+      }
+    } else {
+      h += aneed("아직 한 시간대에만 몰려 있어. 다른 시간대에도 풀어보면 비교가 돼.");
+    }
+  }
+  h += '</div>';
+
+  /* 4 — 추세 */
+  h += '<div class="card"><h2>처음과 지금</h2>';
+  h += '<div class="secintro">기록을 <b>시간순으로 절반씩</b> 갈라서 앞뒤를 견줘. '
+     + '오르는 중인지 아닌지는 하루 단위로는 안 보여.</div>';
+  if (all.length < 6){
+    h += aneed("<b>"+ all.length +"세트</b> / 최소 6세트 — 앞뒤로 가르려면 이만큼은 있어야 해.");
+  } else {
+    h += atrust(all.length, 20, "기록");
+    var half = Math.floor(all.length/2);
+    var early = all.slice(0, half), late = all.slice(all.length - half);
+    h += afind(aptVerdict("trend", accOf(late), accOf(early), "최근", "처음"));
+  }
+  h += '</div>';
+
+  h += '<div class="foot"><button data-act="closeaptin">← 인적성으로</button></div>';
+  return h;
+}
+
 function viewAll(){
   var once = S.tasks.filter(function(t){ return t.repeat === "once"; });
   var rout = S.tasks.filter(function(t){ return t.repeat === "weekly"; });
@@ -3272,6 +3637,40 @@ function doAct(act, n){
     }
     return;
   }
+  if (act === "aexam"){ adraft.exam = n.dataset.x; adraft.type = null; render(); return; }
+  if (act === "atype"){
+    var tv = n.dataset.t;
+    adraft.type = (adraft.type === tv) ? null : tv;
+    render(); return;
+  }
+  if (act === "atod"){ adraft.tod = n.dataset.x; render(); return; }
+  if (act === "aadd"){
+    if (!adraft.type){ toast("유형을 하나 골라줘"); return; }
+    var an = parseInt(el("an").value, 10);
+    var aok = parseInt(el("aok").value, 10);
+    if (!an || an < 1){ el("an").focus(); toast("몇 문제 풀었는지 적어줘"); return; }
+    if (isNaN(aok) || aok < 0){ el("aok").focus(); toast("몇 개 맞았는지 적어줘"); return; }
+    if (aok > an){ toast("맞은 개수가 푼 문항보다 많아"); return; }
+    var amin = parseInt(el("amin").value, 10) || 0;
+    var asec = parseInt(el("asec").value, 10) || 0;
+    var nid = 1;
+    (S.aptit || []).forEach(function(r){ var k = +String(r.id).slice(1) || 0; if (k >= nid) nid = k+1; });
+    S.aptit.push({ id:"a"+nid, ds:iso(today()), exam:adraft.exam, type:adraft.type,
+                   n:an, ok:aok, sec:amin*60+asec, tod:adraft.tod });
+    save(); render();
+    toast(adraft.type + " " + Math.round(aok/an*100) + "% 기록했어 🐙");
+    return;
+  }
+  if (act === "adel"){
+    /* records are the only thing here, so deleting one asks first */
+    if (!confirm("이 기록을 지울까?")) return;
+    S.aptit = (S.aptit || []).filter(function(r){ return r.id !== n.dataset.id; });
+    save(); render(); return;
+  }
+  if (act === "aptin"){
+    el("view").innerHTML = viewAptIn(); wire(); window.scrollTo(0,0); return;
+  }
+  if (act === "closeaptin"){ view = "apt"; render(); window.scrollTo(0,0); return; }
   if (act === "insights"){
     el("view").innerHTML = viewInsights(); wire(); window.scrollTo(0,0); return;
   }
