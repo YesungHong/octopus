@@ -626,6 +626,14 @@ img.pix{image-rendering:pixelated}
   color:var(--bg);font-weight:600}
 .tchips button:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
 .numgrid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:14px}
+.numgrid.three{grid-template-columns:1fr 1fr 1fr}
+.chead{display:flex;align-items:baseline;justify-content:space-between;gap:10px;
+  margin:18px 0 2px;font-size:12px;color:var(--ink-2);font-weight:600}
+.chead i{font-style:normal;font-size:10.5px;color:var(--ink-3);font-weight:400;margin-left:6px}
+.chead b{font-family:var(--font-num);font-size:16px;color:var(--ink);
+  font-variant-numeric:tabular-nums;flex:none}
+.tchips button em{font-style:normal;font-size:10px;opacity:.7;margin-left:3px;
+  font-family:var(--font-num)}
 .numgrid label{display:flex;flex-direction:column;gap:5px;font-size:11px;color:var(--ink-3)}
 .numgrid input{width:100%;background:var(--bg);border:1px solid var(--line);border-radius:9px;
   color:var(--ink);font-family:var(--font-num);font-size:16px;font-variant-numeric:tabular-nums;
@@ -1259,7 +1267,8 @@ function blank(){
     seenWeek: null,
     lastBackup: null,
     backupAsked: null,          /* "YYYY-MM" — 이 달의 백업 물음에 이미 답했다 */
-    aptit: [],                   /* 인적성 기록 — pt와 완전히 분리 */
+    aptit: [],                   /* 인적성 연습 기록 — pt와 완전히 분리 */
+    aptex: [],                   /* 인적성 시험 기록 (영역 통째로) */
     gacha: { used:0, dex:{}, hold:{}, last:null },
     pet: true,                   /* 모은 캐릭터가 화면 아래를 돌아다닌다 */
     petPick: null                /* {k,id} — 산책할 애는 직접 고른다 */
@@ -2595,12 +2604,227 @@ function atrust(n, strong, what){
 }
 function aneed(txt){ return '<div class="need">'+ txt +'</div>'; }
 
+
+/* ── 시험 (영역 통째로 푸는 실전) ──
+   연습(10문제 세트)과 저장소부터 분리한다. 재는 것이 다르기 때문 — 연습은
+   "유형별로 얼마나 맞나", 시험은 "제한시간 안에 어디까지 가나"다. 시험에서는
+   시간을 묻지 않는다. 시간이 고정된 게 시험이니까, 대신 못 푼 문항이 그
+   시간을 말해준다. */
+var EXSEC = {
+  gsat: [ {s:"수리", n:20, min:30}, {s:"추리", n:30, min:30} ],
+  skct: [ {s:"언어이해", n:20, min:15}, {s:"자료해석", n:20, min:15},
+          {s:"창의수리", n:20, min:15}, {s:"언어추리", n:20, min:15},
+          {s:"수열추리", n:20, min:15} ]
+};
+var aptMode = "prac";                 /* prac | exam */
+var exdraft = { sec:null };
+
+function exSecOf(ex, name){
+  var f = EXSEC[ex].filter(function(x){ return x.s === name; });
+  return f.length ? f[0] : null;
+}
+function exRecs(ex){
+  var rs = (S.aptex || []).slice();
+  if (ex) rs = rs.filter(function(r){ return r.exam === ex; });
+  rs.sort(function(a,b){ return a.ds < b.ds ? -1 : (a.ds > b.ds ? 1 : (a.id < b.id ? -1 : 1)); });
+  return rs;
+}
+/* one sitting = one date × one exam. Sections done the same day belong together;
+   that's what makes a point on the chart mean something. */
+function exSittings(ex){
+  var m = {}, order = [];
+  exRecs(ex).forEach(function(r){
+    var k = r.ds + "|" + r.exam;
+    if (!m[k]){ m[k] = { ds:r.ds, exam:r.exam, ok:0, wr:0, sk:0, tot:0, n:0 }; order.push(k); }
+    var sc = exSecOf(r.exam, r.sec);
+    m[k].ok += r.ok; m[k].wr += r.wr; m[k].sk += r.sk;
+    m[k].tot += sc ? sc.n : (r.ok + r.wr + r.sk);
+    m[k].n++;
+  });
+  order.sort();
+  return order.map(function(k){ return m[k]; });
+}
+function exAcc(x){ var d = x.ok + x.wr; return d ? x.ok/d : null; }   /* 맞 / 푼 것 */
+function exReach(x){ return x.tot ? (x.ok + x.wr)/x.tot : null; }     /* 푼 양 */
+
+/* One small line chart. Deliberately plain: dots for what happened, a line
+   between them, no trend line — three sittings do not have a trend. */
+function lineChart(pts, o){
+  if (!pts.length) return "";
+  var W = 320, H = 116, pl = 26, pr = 10, ptop = 12, pb = 20;
+  var n = pts.length, max = o.max;
+  var X = function(i){ return pl + (n <= 1 ? (W-pl-pr)/2 : i*(W-pl-pr)/(n-1)); };
+  var Y = function(v){ return ptop + (1 - v/max) * (H-ptop-pb); };
+  var col = o.color || "var(--t2)";
+
+  var s = '<svg class="schart" viewBox="0 0 '+W+' '+H+'" role="img" aria-label="'+ o.aria +'">';
+  [0, max/2, max].forEach(function(v){
+    s += '<line x1="'+pl+'" y1="'+Y(v).toFixed(1)+'" x2="'+(W-pr)+'" y2="'+Y(v).toFixed(1)+'" '
+       + 'stroke="var(--line-soft)" stroke-width="1"/>'
+       + '<text x="'+(pl-5)+'" y="'+(Y(v)+3.5).toFixed(1)+'" text-anchor="end" '
+       + 'font-size="8" fill="var(--ink-3)">'+ o.tick(v) +'</text>';
+  });
+  for (var k=0;k<n-1;k++){
+    s += '<line x1="'+X(k).toFixed(1)+'" y1="'+Y(pts[k].v).toFixed(1)+'" '
+       + 'x2="'+X(k+1).toFixed(1)+'" y2="'+Y(pts[k+1].v).toFixed(1)+'" '
+       + 'stroke="'+col+'" stroke-width="1.8" stroke-linecap="round"/>';
+  }
+  pts.forEach(function(p,i){
+    s += '<circle cx="'+X(i).toFixed(1)+'" cy="'+Y(p.v).toFixed(1)+'" r="3.2" fill="'+col+'"/>';
+  });
+  /* label the ends only — a phone-width axis can't hold more without lying */
+  var lab = function(i){
+    return '<text x="'+X(i).toFixed(1)+'" y="'+(H-6)+'" text-anchor="middle" '
+         + 'font-size="8" fill="var(--ink-3)">'+ pts[i].lab +'</text>';
+  };
+  s += lab(0);
+  if (n > 1) s += lab(n-1);
+  /* the newest value, spelled out */
+  var last = pts[n-1];
+  s += '<text x="'+(W-pr)+'" y="'+Math.max(9, Y(last.v)-7).toFixed(1)+'" text-anchor="end" '
+     + 'font-size="9" font-weight="700" fill="'+col+'">'+ o.fmt(last.v) +'</text>';
+  s += '</svg>';
+  return s;
+}
+
+function viewAptExam(){
+  var ex = adraft.exam, secs = EXSEC[ex];
+  if (!exdraft.sec || !exSecOf(ex, exdraft.sec)) exdraft.sec = null;
+  var cur = exdraft.sec ? exSecOf(ex, exdraft.sec) : null;
+  var recs = exRecs(ex), sits = exSittings(ex);
+
+  /* ── 기록하기 ── */
+  var h = '<div class="card"><h2>시험 기록</h2>';
+  h += '<div class="secintro">제한시간 걸고 <b>영역 하나를 통째로</b> 푼 날 여기에 적어. '
+     + '연습이랑 따로 쌓여 — 재는 게 다르니까.</div>';
+  h += '<div class="seg" style="margin-top:12px">'
+     + ["gsat","skct"].map(function(k){
+         return '<button data-act="aexam" data-x="'+k+'" aria-pressed="'+(ex===k)+'">'+ APT[k].nm +'</button>';
+       }).join("")
+     + '</div>';
+  h += '<div class="tglab">영역</div><div class="tchips">'
+     + secs.map(function(x){
+         return '<button data-act="exsec" data-t="'+ esc(x.s) +'" aria-pressed="'+(exdraft.sec===x.s)+'">'
+              + esc(x.s) +' <em>'+ x.n +'문항 '+ x.min +'분</em></button>';
+       }).join("")
+     + '</div>';
+
+  h += '<div class="numgrid three">'
+     + '<label>맞은<input type="number" id="exok" inputmode="numeric" min="0" max="99" placeholder="0"></label>'
+     + '<label>틀린<input type="number" id="exwr" inputmode="numeric" min="0" max="99" placeholder="0"></label>'
+     + '<label>못 푼<input type="number" id="exsk" inputmode="numeric" min="0" max="99" placeholder="0"></label>'
+     + '</div>';
+  h += '<div class="studyhint" style="text-align:left">'
+     + (cur ? '<b>'+ esc(cur.s) +' '+ cur.n +'문항</b> · 세 칸을 더하면 '+ cur.n +'이 돼야 해. '
+            + '<b>못 푼</b> 칸은 비워두면 나머지로 자동으로 채워.'
+           : '영역을 먼저 골라줘. 영역마다 총 문항 수가 달라.')
+     + '</div>';
+  h += '<button class="addbtn" data-act="exadd" style="width:100%;margin-top:12px">시험 기록 추가</button>';
+  h += '</div>';
+
+  /* ── 그래프 ── */
+  h += '<div class="card"><h2>추이<em>'+ APT[ex].nm +' · 회차별</em></h2>';
+  if (!sits.length){
+    h += aneed("시험을 한 번 적으면 여기에 점이 하나 찍혀. 두 번째부터 선이 생겨.");
+  } else {
+    h += '<div class="secintro">같은 날 같은 시험은 <b>한 회차</b>로 묶어서 그려. '
+       + '영역을 나눠 풀어도 그날의 성적으로 합쳐진다는 뜻이야.</div>';
+    var labOf = function(x){ return md(parseISO(x.ds)); };
+
+    var accPts = sits.filter(function(x){ return exAcc(x) !== null; })
+                     .map(function(x){ return { lab:labOf(x), v:exAcc(x)*100 }; });
+    var rchPts = sits.filter(function(x){ return exReach(x) !== null; })
+                     .map(function(x){ return { lab:labOf(x), v:exReach(x)*100 }; });
+    var maxTot = Math.max.apply(null, sits.map(function(x){ return x.tot; }));
+    var okPts  = sits.map(function(x){ return { lab:labOf(x), v:x.ok }; });
+
+    var pctTick = function(v){ return Math.round(v) + ""; };
+    var pctFmt  = function(v){ return Math.round(v) + "%"; };
+
+    h += '<div class="chead"><span>정답률<i>맞은 / 푼 것</i></span><b>'
+       + (accPts.length ? pctFmt(accPts[accPts.length-1].v) : "—") +'</b></div>';
+    h += lineChart(accPts, {max:100, tick:pctTick, fmt:pctFmt, color:"var(--good)",
+                            aria:"회차별 정답률"});
+
+    h += '<div class="chead"><span>푼 양<i>못 푼 문항을 뺀 비율</i></span><b>'
+       + (rchPts.length ? pctFmt(rchPts[rchPts.length-1].v) : "—") +'</b></div>';
+    h += lineChart(rchPts, {max:100, tick:pctTick, fmt:pctFmt, color:"var(--t2)",
+                            aria:"회차별 푼 양"});
+
+    h += '<div class="chead"><span>맞은 개수<i>회차 전체</i></span><b>'
+       + okPts[okPts.length-1].v +'개</b></div>';
+    h += lineChart(okPts, {max:Math.max(5, maxTot), tick:function(v){ return Math.round(v)+""; },
+                           fmt:function(v){ return Math.round(v)+"개"; },
+                           color:"var(--accent)", aria:"회차별 맞은 개수"});
+
+    h += '<div class="cnote">정답률은 <b>고른 것 중 얼마나 맞았나</b>, 푼 양은 '
+       + '<b>시간 안에 어디까지 갔나</b>야. 둘이 같이 안 움직이는 게 정상이고, '
+       + '어느 쪽이 발목을 잡는지가 이 두 줄로 갈려.</div>';
+  }
+  h += '</div>';
+
+  /* ── 영역별 ── */
+  h += '<div class="card"><h2>영역별<em>'+ APT[ex].nm +'</em></h2>';
+  if (!recs.length){
+    h += aneed("시험 기록이 생기면 여기부터 채워져.");
+  } else {
+    h += atrust(recs.length, 10, "시험 기록");
+    var rows = secs.map(function(sc){
+      var inS = recs.filter(function(r){ return r.sec === sc.s; });
+      var agg = { ok:0, wr:0, sk:0, tot:0 };
+      inS.forEach(function(r){ agg.ok+=r.ok; agg.wr+=r.wr; agg.sk+=r.sk; agg.tot+=sc.n; });
+      return { s:sc.s, n:inS.length, acc:exAcc(agg), reach:exReach(agg), ok:agg.ok };
+    }).filter(function(r){ return r.n > 0; });
+    rows.sort(function(a,b){ return a.acc - b.acc; });
+
+    h += '<div class="btable">';
+    rows.forEach(function(r){
+      h += '<div class="brow"><div class="bl">'+ esc(r.s) +'<s>'+ r.n +'회</s></div>'
+         + '<div class="bv">'
+         +   '<div class="bcell"><span>정답률</span><u>'+ pctText(r.acc) +'</u>'+ bar(r.acc, "good") +'</div>'
+         +   '<div class="bcell"><span>푼 양</span><u>'+ pctText(r.reach) +'</u>'+ bar(r.reach, "acc") +'</div>'
+         + '</div></div>';
+    });
+    h += '</div>';
+  }
+  h += '</div>';
+
+  /* ── 최근 기록 ── */
+  h += '<div class="card"><h2>최근 시험<em>'+ APT[ex].nm +'</em></h2>';
+  if (!recs.length){
+    h += '<div class="empty">아직 '+ APT[ex].nm +' 시험 기록이 없어.</div>';
+  } else {
+    h += '<div class="list">';
+    recs.slice(-12).reverse().forEach(function(r){
+      var sc = exSecOf(r.exam, r.sec), tot = sc ? sc.n : (r.ok+r.wr+r.sk);
+      var a = exAcc(r);
+      h += '<div class="aprow">'
+         + '<div class="ad">'+ md(parseISO(r.ds)) +'</div>'
+         + '<div class="at">'+ esc(r.sec) +'<s>맞 '+ r.ok +' · 틀 '+ r.wr +' · 못 '+ r.sk +' / '+ tot +'</s></div>'
+         + '<div class="ar">'+ pctText(a) +'<s>푼 양 '+ pctText(exReach({ok:r.ok,wr:r.wr,tot:tot})) +'</s></div>'
+         + '<button class="adel" data-act="exdel" data-id="'+ r.id +'" aria-label="지우기">×</button>'
+         + '</div>';
+    });
+    h += '</div>';
+  }
+  h += '</div>';
+  return h;
+}
+
 function viewApt(){
+  /* 연습 ↔ 시험 — 같은 탭, 다른 기록판 */
+  var mh = '<div class="seg" style="margin-bottom:14px">'
+    + [["prac","연습"],["exam","시험"]].map(function(m){
+        return '<button data-act="amode" data-x="'+m[0]+'" aria-pressed="'
+             + (aptMode===m[0]) +'">'+ m[1] +'</button>';
+      }).join("")
+    + '</div>';
+  if (aptMode === "exam") return mh + viewAptExam();
   if (!adraft.tod) adraft.tod = todNow();
   var ex = adraft.exam, all = aptRecs(), recs = aptRecs(ex);
 
   /* ── 기록하기 ── */
-  var h = '<div class="card"><h2>기록하기</h2>';
+  var h = mh + '<div class="card"><h2>기록하기</h2>';
   h += '<div class="secintro">한 세트 풀고 <b>몇 문제 · 몇 개 맞음 · 걸린 시간</b>만 적어. '
      + 'pt나 뽑기권에는 안 들어가 — 여기는 순수한 기록판이야.</div>';
   h += '<div class="seg" style="margin-top:12px">'
@@ -3636,6 +3860,42 @@ function doAct(act, n){
       save(); view = "day"; render();
     }
     return;
+  }
+  if (act === "amode"){ aptMode = n.dataset.x; render(); window.scrollTo(0,0); return; }
+  if (act === "exsec"){
+    var sv = n.dataset.t;
+    exdraft.sec = (exdraft.sec === sv) ? null : sv;
+    render(); return;
+  }
+  if (act === "exadd"){
+    if (!exdraft.sec){ toast("영역을 골라줘"); return; }
+    var scd = exSecOf(adraft.exam, exdraft.sec);
+    var xok = parseInt(el("exok").value, 10);
+    var xwr = parseInt(el("exwr").value, 10);
+    var xskRaw = el("exsk").value.trim();
+    if (isNaN(xok) || xok < 0){ el("exok").focus(); toast("맞은 개수를 적어줘"); return; }
+    if (isNaN(xwr) || xwr < 0){ el("exwr").focus(); toast("틀린 개수를 적어줘"); return; }
+    /* leaving 못 푼 blank is the common case — the rest of the section is what
+       you never reached, and the app can work that out itself */
+    var xsk = xskRaw === "" ? (scd.n - xok - xwr) : parseInt(xskRaw, 10);
+    if (isNaN(xsk) || xsk < 0){ toast("못 푼 개수가 이상해"); return; }
+    if (xok + xwr + xsk !== scd.n){
+      toast("합이 " + (xok+xwr+xsk) + "이야 · " + scd.s + "는 " + scd.n + "문항");
+      return;
+    }
+    var xid = 1;
+    (S.aptex || []).forEach(function(r){ var k = +String(r.id).slice(1) || 0; if (k >= xid) xid = k+1; });
+    S.aptex.push({ id:"x"+xid, ds:iso(today()), exam:adraft.exam, sec:exdraft.sec,
+                   ok:xok, wr:xwr, sk:xsk });
+    save(); render();
+    toast(exdraft.sec + " " + pctText(exAcc({ok:xok,wr:xwr})) + " · 푼 양 "
+          + pctText((xok+xwr)/scd.n) + " 🐙");
+    return;
+  }
+  if (act === "exdel"){
+    if (!confirm("이 시험 기록을 지울까?")) return;
+    S.aptex = (S.aptex || []).filter(function(r){ return r.id !== n.dataset.id; });
+    save(); render(); return;
   }
   if (act === "aexam"){ adraft.exam = n.dataset.x; adraft.type = null; render(); return; }
   if (act === "atype"){
