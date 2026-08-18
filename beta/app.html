@@ -627,6 +627,22 @@ img.pix{image-rendering:pixelated}
 .tchips button:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
 .numgrid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:14px}
 .numgrid.three{grid-template-columns:1fr 1fr 1fr}
+.apedit{padding:12px;border-radius:10px;background:var(--sunk);border:1px solid var(--line);
+  margin:6px 0}
+.apedit .ael{font-size:12px;color:var(--ink-3)}
+.apedit .ael b{color:var(--ink);font-size:13px}
+.apedit .ael s{display:block;text-decoration:none;font-size:10.5px;margin-top:2px}
+.apedit .numgrid{margin-top:10px}
+.apedit .submitrow{margin-top:12px}
+.runrow{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:14px;
+  padding:10px 12px;border-radius:9px;background:var(--sunk)}
+.runrow .rl{font-size:12px;color:var(--ink-2)}
+.runrow .rl b{font-family:var(--font-num);font-size:14px;color:var(--ink)}
+.runrow .rl s{display:block;text-decoration:none;font-size:10.5px;color:var(--ink-3)}
+.runbtn{appearance:none;border:1px solid var(--line);background:var(--bg);color:var(--ink-2);
+  font:inherit;font-size:11.5px;padding:7px 11px;border-radius:8px;cursor:pointer;flex:none}
+.runbtn:hover,.runbtn:focus-visible{color:var(--ink);border-color:var(--ink-3)}
+.aprow .ad s{display:block;text-decoration:none;font-size:9.5px}
 .chead{display:flex;align-items:baseline;justify-content:space-between;gap:10px;
   margin:18px 0 2px;font-size:12px;color:var(--ink-2);font-weight:600}
 .chead i{font-style:normal;font-size:10.5px;color:var(--ink-3);font-weight:400;margin-left:6px}
@@ -1318,6 +1334,17 @@ function load(){
       if (!Object.keys(store[d]).length) delete store[d];
     }
   });
+  /* 회차 없이 저장된 시험 기록에 회차를 매긴다 — 그때는 하루가 곧 한 회차였다 */
+  var runSeen = {};
+  (S.aptex || []).slice().sort(function(a,b){ return a.ds < b.ds ? -1 : (a.ds > b.ds ? 1 : 0); })
+    .forEach(function(r){
+      if (r.run) return;
+      if (!runSeen[r.exam]) runSeen[r.exam] = { ds:null, run:0 };
+      var st = runSeen[r.exam];
+      if (st.ds !== r.ds){ st.ds = r.ds; st.run++; }
+      r.run = st.run;
+    });
+
   /* seed on first run so the question starts at the next month boundary
      rather than firing the moment this version lands mid-month */
   if (!S.backupAsked) S.backupAsked = monthKey(today());
@@ -2617,7 +2644,8 @@ var EXSEC = {
           {s:"수열추리", n:20, min:15} ]
 };
 var aptMode = "prac";                 /* prac | exam */
-var exdraft = { sec:null };
+var exdraft = { sec:null, newrun:false };
+var exEditId = null, aEditId = null;   /* 기록 한 줄을 그 자리에서 고친다 */
 
 function exSecOf(ex, name){
   var f = EXSEC[ex].filter(function(x){ return x.s === name; });
@@ -2629,20 +2657,34 @@ function exRecs(ex){
   rs.sort(function(a,b){ return a.ds < b.ds ? -1 : (a.ds > b.ds ? 1 : (a.id < b.id ? -1 : 1)); });
   return rs;
 }
-/* one sitting = one date × one exam. Sections done the same day belong together;
-   that's what makes a point on the chart mean something. */
+/* one sitting = one 회차. Not one date — two sittings can happen in a day, and
+   merging them would average away exactly the comparison worth seeing. A 회차
+   closes on its own when the day changes or when a section repeats; the form
+   also has a button to start one by hand. */
 function exSittings(ex){
   var m = {}, order = [];
   exRecs(ex).forEach(function(r){
-    var k = r.ds + "|" + r.exam;
-    if (!m[k]){ m[k] = { ds:r.ds, exam:r.exam, ok:0, wr:0, sk:0, tot:0, n:0 }; order.push(k); }
+    var run = r.run || 1;
+    var k = r.exam + "|" + run;
+    if (!m[k]){ m[k] = { run:run, ds:r.ds, exam:r.exam, ok:0, wr:0, sk:0, tot:0, n:0 }; order.push(k); }
     var sc = exSecOf(r.exam, r.sec);
     m[k].ok += r.ok; m[k].wr += r.wr; m[k].sk += r.sk;
     m[k].tot += sc ? sc.n : (r.ok + r.wr + r.sk);
     m[k].n++;
+    if (r.ds > m[k].ds) m[k].ds = r.ds;
   });
-  order.sort();
+  order.sort(function(a,b){ return (+a.split("|")[1]) - (+b.split("|")[1]); });
   return order.map(function(k){ return m[k]; });
+}
+/* which 회차 the next record lands in */
+function exRunFor(ex, sec, forceNew){
+  var rs = exRecs(ex);
+  if (!rs.length) return 1;
+  var last = rs[rs.length-1], lastRun = last.run || 1;
+  if (forceNew) return lastRun + 1;
+  if (last.ds !== iso(today())) return lastRun + 1;
+  var taken = rs.some(function(r){ return (r.run||1) === lastRun && r.sec === sec; });
+  return taken ? lastRun + 1 : lastRun;
 }
 function exAcc(x){ var d = x.ok + x.wr; return d ? x.ok/d : null; }   /* 맞 / 푼 것 */
 function exReach(x){ return x.tot ? (x.ok + x.wr)/x.tot : null; }     /* 푼 양 */
@@ -2719,6 +2761,13 @@ function viewAptExam(){
             + '<b>못 푼</b> 칸은 비워두면 나머지로 자동으로 채워.'
            : '영역을 먼저 골라줘. 영역마다 총 문항 수가 달라.')
      + '</div>';
+  var willRun = exRunFor(ex, exdraft.sec, exdraft.newrun);
+  var openRun = recs.length && recs[recs.length-1].ds === iso(today())
+              && (recs[recs.length-1].run||1) === willRun;
+  h += '<div class="runrow"><div class="rl">이 기록은 <b>'+ willRun +'회차</b>'
+     + (openRun ? '<s>오늘 보던 회차에 이어서</s>' : '<s>새 회차로 시작</s>') +'</div>'
+     + (openRun ? '<button class="runbtn" data-act="exnewrun">새 회차로</button>' : '')
+     + '</div>';
   h += '<button class="addbtn" data-act="exadd" style="width:100%;margin-top:12px">시험 기록 추가</button>';
   h += '</div>';
 
@@ -2727,9 +2776,10 @@ function viewAptExam(){
   if (!sits.length){
     h += aneed("시험을 한 번 적으면 여기에 점이 하나 찍혀. 두 번째부터 선이 생겨.");
   } else {
-    h += '<div class="secintro">같은 날 같은 시험은 <b>한 회차</b>로 묶어서 그려. '
-       + '영역을 나눠 풀어도 그날의 성적으로 합쳐진다는 뜻이야.</div>';
-    var labOf = function(x){ return md(parseISO(x.ds)); };
+    h += '<div class="secintro">가로축은 <b>회차</b>야. 한 회차에 영역을 나눠 풀면 합쳐지고, '
+       + '하루에 두 번 봤으면 <b>따로 찍혀</b>. 최근 '+ sits.length +'회차 · '
+       + '마지막 '+ md(parseISO(sits[sits.length-1].ds)) +'.</div>';
+    var labOf = function(x){ return x.run + "회"; };
 
     var accPts = sits.filter(function(x){ return exAcc(x) !== null; })
                      .map(function(x){ return { lab:labOf(x), v:exAcc(x)*100 }; });
@@ -2798,10 +2848,26 @@ function viewAptExam(){
     recs.slice(-12).reverse().forEach(function(r){
       var sc = exSecOf(r.exam, r.sec), tot = sc ? sc.n : (r.ok+r.wr+r.sk);
       var a = exAcc(r);
+      if (r.id === exEditId){
+        h += '<div class="apedit">'
+           + '<div class="ael">'+ (r.run||1) +'회차 · '+ md(parseISO(r.ds)) +' · <b>'+ esc(r.sec) +'</b>'
+           +   '<s>세 칸의 합이 '+ tot +'이 돼야 해</s></div>'
+           + '<div class="numgrid three">'
+           +   '<label>맞은<input type="number" id="exeok" inputmode="numeric" min="0" max="99" value="'+ r.ok +'"></label>'
+           +   '<label>틀린<input type="number" id="exewr" inputmode="numeric" min="0" max="99" value="'+ r.wr +'"></label>'
+           +   '<label>못 푼<input type="number" id="exesk" inputmode="numeric" min="0" max="99" value="'+ r.sk +'"></label>'
+           + '</div>'
+           + '<div class="submitrow">'
+           +   '<button class="ghost" data-act="exeditcancel">취소</button>'
+           +   '<button class="submit" data-act="exeditsave" data-id="'+ r.id +'">저장</button>'
+           + '</div></div>';
+        return;
+      }
       h += '<div class="aprow">'
-         + '<div class="ad">'+ md(parseISO(r.ds)) +'</div>'
+         + '<div class="ad">'+ (r.run||1) +'회<s>'+ md(parseISO(r.ds)) +'</s></div>'
          + '<div class="at">'+ esc(r.sec) +'<s>맞 '+ r.ok +' · 틀 '+ r.wr +' · 못 '+ r.sk +' / '+ tot +'</s></div>'
          + '<div class="ar">'+ pctText(a) +'<s>푼 양 '+ pctText(exReach({ok:r.ok,wr:r.wr,tot:tot})) +'</s></div>'
+         + '<button class="adel" data-act="exedit" data-id="'+ r.id +'" aria-label="고치기">✎</button>'
          + '<button class="adel" data-act="exdel" data-id="'+ r.id +'" aria-label="지우기">×</button>'
          + '</div>';
     });
@@ -2867,12 +2933,37 @@ function viewApt(){
     h += '<div class="list">';
     last.forEach(function(r){
       var d = parseISO(r.ds);
+      if (r.id === aEditId){
+        h += '<div class="apedit">'
+           + '<div class="ael">'+ md(d) +' · <b>'+ esc(r.type) +'</b>'
+           +   '<s>시간은 비우면 없는 걸로 둬</s></div>'
+           + '<div class="numgrid">'
+           +   '<label>푼 문항<input type="number" id="aeon" inputmode="numeric" min="1" max="200" value="'+ r.n +'"></label>'
+           +   '<label>맞은 개수<input type="number" id="aeok" inputmode="numeric" min="0" max="200" value="'+ r.ok +'"></label>'
+           +   '<label>걸린 시간 (분)<input type="number" id="aemin" inputmode="numeric" min="0" max="600" value="'
+           +      (r.sec > 0 ? Math.floor(r.sec/60) : "") +'"></label>'
+           +   '<label>초<input type="number" id="aesec" inputmode="numeric" min="0" max="59" value="'
+           +      (r.sec > 0 ? (r.sec%60) : "") +'"></label>'
+           + '</div>'
+           + '<div class="tglab">언제 풀었어</div><div class="seg">'
+           +   TODK.map(function(k){
+                 return '<button data-act="aedittod" data-x="'+k+'" data-id="'+ r.id +'" aria-pressed="'
+                      + (r.tod===k) +'">'+ TOD[k] +'</button>';
+               }).join("")
+           + '</div>'
+           + '<div class="submitrow">'
+           +   '<button class="ghost" data-act="aeditcancel">취소</button>'
+           +   '<button class="submit" data-act="aeditsave" data-id="'+ r.id +'">저장</button>'
+           + '</div></div>';
+        return;
+      }
       h += '<div class="aprow">'
          + '<div class="ad">'+ md(d) +'</div>'
          + '<div class="at">'+ esc(r.type) +'<s>'+ TOD[r.tod] +' · '+ r.ok +'/'+ r.n +'문항'
          +   (r.sec > 0 ? ' · '+ secText(r.sec) : '') +'</s></div>'
          + '<div class="ar">'+ Math.round(r.ok/r.n*100) +'%'
          +   (r.sec > 0 ? '<s>문항당 '+ secText(r.sec/r.n) +'</s>' : '') +'</div>'
+         + '<button class="adel" data-act="aedit" data-id="'+ r.id +'" aria-label="고치기">✎</button>'
          + '<button class="adel" data-act="adel" data-id="'+ r.id +'" aria-label="지우기">×</button>'
          + '</div>';
     });
@@ -3861,7 +3952,55 @@ function doAct(act, n){
     }
     return;
   }
-  if (act === "amode"){ aptMode = n.dataset.x; render(); window.scrollTo(0,0); return; }
+  if (act === "amode"){
+    aptMode = n.dataset.x; exEditId = null; aEditId = null;
+    render(); window.scrollTo(0,0); return;
+  }
+  /* 시험 기록 고치기 */
+  if (act === "exedit"){ exEditId = n.dataset.id; aEditId = null; render(); return; }
+  if (act === "exeditcancel"){ exEditId = null; render(); return; }
+  if (act === "exeditsave"){
+    var er = (S.aptex || []).filter(function(r){ return r.id === n.dataset.id; })[0];
+    if (!er){ exEditId = null; render(); return; }
+    var esc_ = exSecOf(er.exam, er.sec);
+    var etot = esc_ ? esc_.n : (er.ok + er.wr + er.sk);
+    var eok = parseInt(el("exeok").value, 10);
+    var ewr = parseInt(el("exewr").value, 10);
+    var esk = parseInt(el("exesk").value, 10);
+    if (isNaN(eok) || isNaN(ewr) || isNaN(esk) || eok < 0 || ewr < 0 || esk < 0){
+      toast("숫자를 다 채워줘"); return;
+    }
+    if (eok + ewr + esk !== etot){
+      toast("합이 " + (eok+ewr+esk) + "이야 · " + er.sec + "는 " + etot + "문항");
+      return;
+    }
+    er.ok = eok; er.wr = ewr; er.sk = esk;
+    exEditId = null; save(); render(); toast("고쳤어 🐙");
+    return;
+  }
+  /* 연습 기록 고치기 */
+  if (act === "aedit"){ aEditId = n.dataset.id; exEditId = null; render(); return; }
+  if (act === "aeditcancel"){ aEditId = null; render(); return; }
+  if (act === "aedittod"){
+    var tr = (S.aptit || []).filter(function(r){ return r.id === n.dataset.id; })[0];
+    if (tr){ tr.tod = n.dataset.x; save(); render(); }
+    return;
+  }
+  if (act === "aeditsave"){
+    var ar = (S.aptit || []).filter(function(r){ return r.id === n.dataset.id; })[0];
+    if (!ar){ aEditId = null; render(); return; }
+    var vn = parseInt(el("aeon").value, 10);
+    var vok = parseInt(el("aeok").value, 10);
+    if (!vn || vn < 1){ el("aeon").focus(); toast("푼 문항을 적어줘"); return; }
+    if (isNaN(vok) || vok < 0){ el("aeok").focus(); toast("맞은 개수를 적어줘"); return; }
+    if (vok > vn){ toast("맞은 개수가 푼 문항보다 많아"); return; }
+    var vmin = parseInt(el("aemin").value, 10) || 0;
+    var vsec = parseInt(el("aesec").value, 10) || 0;
+    ar.n = vn; ar.ok = vok; ar.sec = vmin*60 + vsec;
+    aEditId = null; save(); render(); toast("고쳤어 🐙");
+    return;
+  }
+  if (act === "exnewrun"){ exdraft.newrun = true; render(); toast("새 회차로 적을게"); return; }
   if (act === "exsec"){
     var sv = n.dataset.t;
     exdraft.sec = (exdraft.sec === sv) ? null : sv;
@@ -3885,17 +4024,19 @@ function doAct(act, n){
     }
     var xid = 1;
     (S.aptex || []).forEach(function(r){ var k = +String(r.id).slice(1) || 0; if (k >= xid) xid = k+1; });
+    var xrun = exRunFor(adraft.exam, exdraft.sec, exdraft.newrun);
     S.aptex.push({ id:"x"+xid, ds:iso(today()), exam:adraft.exam, sec:exdraft.sec,
-                   ok:xok, wr:xwr, sk:xsk });
+                   ok:xok, wr:xwr, sk:xsk, run:xrun });
+    exdraft.newrun = false;
     save(); render();
-    toast(exdraft.sec + " " + pctText(exAcc({ok:xok,wr:xwr})) + " · 푼 양 "
+    toast(xrun + "회차 " + exdraft.sec + " " + pctText(exAcc({ok:xok,wr:xwr})) + " · 푼 양 "
           + pctText((xok+xwr)/scd.n) + " 🐙");
     return;
   }
   if (act === "exdel"){
     if (!confirm("이 시험 기록을 지울까?")) return;
     S.aptex = (S.aptex || []).filter(function(r){ return r.id !== n.dataset.id; });
-    save(); render(); return;
+    exEditId = null; save(); render(); return;
   }
   if (act === "aexam"){ adraft.exam = n.dataset.x; adraft.type = null; render(); return; }
   if (act === "atype"){
@@ -3925,7 +4066,7 @@ function doAct(act, n){
     /* records are the only thing here, so deleting one asks first */
     if (!confirm("이 기록을 지울까?")) return;
     S.aptit = (S.aptit || []).filter(function(r){ return r.id !== n.dataset.id; });
-    save(); render(); return;
+    aEditId = null; save(); render(); return;
   }
   if (act === "aptin"){
     el("view").innerHTML = viewAptIn(); wire(); window.scrollTo(0,0); return;
