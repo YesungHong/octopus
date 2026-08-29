@@ -244,14 +244,19 @@ button,.row,.chip,.tabs button,.condpick button,.seg button,.dowpick button{
 .box svg{width:11px;height:11px;stroke:var(--bg);stroke-width:2.6;fill:none;
   stroke-linecap:round;stroke-linejoin:round;opacity:0}
 .row.on .box svg{opacity:1}
-/* 일간 rows carry the tier as a 3px stripe instead of a badge — the badge was
-   eating 45px of a 280px row and squeezing every title into an ellipsis.
-   inset shadow, not border, so nothing shifts and the corner radius is kept.
-   일정 0 gets no stripe at all: no points, no colour. */
-.row.tl{gap:8px;padding-left:11px}
-.row.tl.q1{box-shadow:inset 3px 0 0 var(--q1)}
-.row.tl.q2{box-shadow:inset 3px 0 0 var(--q2)}
-.row.tl.q3{box-shadow:inset 3px 0 0 var(--q3)}
+/* 일간 rows carry the tier as a colour outline around the whole block instead of
+   a badge — the badge was eating 45px of a 280px row and turning every title into
+   an ellipsis. inset shadow, not border, so nothing shifts and the radius is kept.
+   일정 0 keeps the shape but stays colourless: no points, no colour.
+   Checked rows fade their outline — they are done, they should stop asking. */
+.row.tl{gap:8px;padding:10px;margin-bottom:5px;
+  box-shadow:inset 0 0 0 1px var(--line-soft)}
+.row.tl.q1{box-shadow:inset 0 0 0 1px var(--q1)}
+.row.tl.q2{box-shadow:inset 0 0 0 1px var(--q2)}
+.row.tl.q3{box-shadow:inset 0 0 0 1px var(--q3)}
+.row.tl.on.q1{box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--q1) 40%,transparent)}
+.row.tl.on.q2{box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--q2) 40%,transparent)}
+.row.tl.on.q3{box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--q3) 40%,transparent)}
 .row .ttl{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:14px}
 .row.on .ttl{color:var(--ink-3);text-decoration:line-through;text-decoration-thickness:1px}
 .tier{font-family:var(--font-num);font-size:10px;font-weight:700;letter-spacing:.04em;
@@ -315,13 +320,13 @@ button,.row,.chip,.tabs button,.condpick button,.seg button,.dowpick button{
 .row.on .atchip.set{border-color:var(--line-soft);background:transparent;color:var(--ink-3)}
 .atchip:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 
-.nowline{display:flex;align-items:center;gap:7px;margin:4px 0;pointer-events:none}
+.nowline{display:flex;align-items:center;gap:7px;margin:8px 0 10px;pointer-events:none}
 .nowline::before{content:"";width:52px;height:1px;background:var(--accent);opacity:.45;flex:none}
 .nowline::after{content:"";flex:1;height:1px;background:var(--accent);opacity:.28}
 .nowline span{font-family:var(--font-num);font-size:10px;font-weight:650;letter-spacing:.06em;
   color:var(--accent-ink);flex:none;font-variant-numeric:tabular-nums}
 
-.secdiv{font-size:10px;letter-spacing:.11em;color:var(--ink-3);margin:11px 0 3px;padding-left:8px}
+.secdiv{font-size:10px;letter-spacing:.11em;color:var(--ink-3);margin:13px 0 6px;padding-left:8px}
 
 .timegrid.one{grid-template-columns:1fr}
 .natbox label{flex-direction:row;align-items:center;gap:10px}
