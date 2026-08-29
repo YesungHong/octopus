@@ -29,6 +29,7 @@
   --good:#2C7A5E;
   --good-soft:rgba(44,122,94,.13);
   --cs1:#93A6AB; --cs2:#7C9AA3; --cs3:#3F7F8C; --cs4:#3D8A72; --cs5:#2C7A5E;
+  --q1:#3F8FA8; --q2:#9A5B93; --q3:#C2622D;   /* 티어 색: 물 → 꽃 → 흙 */
   --t0:#A6B6BA;
   --t1:#7C939A;
   --t2:#3F7F8C;
@@ -54,6 +55,7 @@
     --good:#4FA383;
     --good-soft:rgba(79,163,131,.16);
     --cs1:#5E767D; --cs2:#5B8B96; --cs3:#5AA2B0; --cs4:#4FA383; --cs5:#6FBF9C;
+    --q1:#5AA2B0; --q2:#BE84B6; --q3:#E08B4A;
     --t0:#55686F;
     --t1:#6A828A;
     --t2:#5AA2B0;
@@ -77,6 +79,7 @@
   --good:#4FA383;
   --good-soft:rgba(79,163,131,.16);
   --cs1:#5E767D; --cs2:#5B8B96; --cs3:#5AA2B0; --cs4:#4FA383; --cs5:#6FBF9C;
+  --q1:#5AA2B0; --q2:#BE84B6; --q3:#E08B4A;
   --t0:#55686F;
   --t1:#6A828A;
   --t2:#5AA2B0;
@@ -171,7 +174,7 @@ button,.row,.chip,.tabs button,.condpick button,.seg button,.dowpick button{
 .blk{border-radius:3px;display:flex;align-items:center;justify-content:center;
   font-family:var(--font-num);font-size:10px;font-weight:700;color:var(--bg);
   animation:pop .28s cubic-bezier(.2,.9,.3,1.4)}
-.blk.t1{background:var(--t1)} .blk.t2{background:var(--t2)} .blk.t3{background:var(--t3)}
+.blk.t1{background:var(--q1)} .blk.t2{background:var(--q2)} .blk.t3{background:var(--q3)}
 @keyframes pop{from{transform:scaleX(.3);opacity:0}to{transform:scaleX(1);opacity:1}}
 @media (prefers-reduced-motion:reduce){.blk{animation:none}}
 .track-legend{display:flex;justify-content:space-between;font-family:var(--font-num);
@@ -241,14 +244,22 @@ button,.row,.chip,.tabs button,.condpick button,.seg button,.dowpick button{
 .box svg{width:11px;height:11px;stroke:var(--bg);stroke-width:2.6;fill:none;
   stroke-linecap:round;stroke-linejoin:round;opacity:0}
 .row.on .box svg{opacity:1}
+/* 일간 rows carry the tier as a 3px stripe instead of a badge — the badge was
+   eating 45px of a 280px row and squeezing every title into an ellipsis.
+   inset shadow, not border, so nothing shifts and the corner radius is kept.
+   일정 0 gets no stripe at all: no points, no colour. */
+.row.tl{gap:8px;padding-left:11px}
+.row.tl.q1{box-shadow:inset 3px 0 0 var(--q1)}
+.row.tl.q2{box-shadow:inset 3px 0 0 var(--q2)}
+.row.tl.q3{box-shadow:inset 3px 0 0 var(--q3)}
 .row .ttl{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:14px}
 .row.on .ttl{color:var(--ink-3);text-decoration:line-through;text-decoration-thickness:1px}
 .tier{font-family:var(--font-num);font-size:10px;font-weight:700;letter-spacing:.04em;
   padding:2px 6px;border-radius:4px;flex:none}
 .tier.t0{color:var(--t0);background:transparent;border:1px solid color-mix(in srgb,var(--t0) 40%,transparent);padding:1px 5px}
-.tier.t1{color:var(--t1);background:color-mix(in srgb,var(--t1) 15%,transparent)}
-.tier.t2{color:var(--t2);background:color-mix(in srgb,var(--t2) 15%,transparent)}
-.tier.t3{color:var(--t3);background:color-mix(in srgb,var(--t3) 18%,transparent)}
+.tier.t1{color:var(--q1);background:color-mix(in srgb,var(--q1) 15%,transparent)}
+.tier.t2{color:var(--q2);background:color-mix(in srgb,var(--q2) 15%,transparent)}
+.tier.t3{color:var(--q3);background:color-mix(in srgb,var(--q3) 18%,transparent)}
 .dayspec{font-family:var(--font-num);font-size:10.5px;color:var(--ink-3);flex:none;letter-spacing:.06em}
 /* touch devices have no hover, so row buttons must stay visible there */
 .del,.edit{appearance:none;border:0;background:transparent;color:var(--ink-3);cursor:pointer;
@@ -271,6 +282,8 @@ button,.row,.chip,.tabs button,.condpick button,.seg button,.dowpick button{
 .editbtns button{flex:1;appearance:none;border:0;font:inherit;font-size:13px;font-weight:650;
   padding:10px;border-radius:8px;cursor:pointer}
 .editbtns .ghost{background:transparent;border:1px solid var(--line);color:var(--ink-2)}
+.editbtns .danger{flex:0 0 auto;padding-left:16px;padding-right:16px;color:var(--ink-3)}
+.editbtns .danger:hover{color:var(--accent-ink);border-color:var(--accent)}
 .editbtns .ghost:hover{background:var(--bg)}
 .editbtns .save{background:var(--ink);color:var(--bg)}
 .editbtns button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
@@ -295,7 +308,7 @@ button,.row,.chip,.tabs button,.condpick button,.seg button,.dowpick button{
    devices have no hover to reveal it */
 .atchip{appearance:none;border:1px dashed var(--line);background:transparent;color:var(--ink-3);
   font-family:var(--font-num);font-size:11px;font-weight:600;padding:4px 0;border-radius:6px;
-  cursor:pointer;flex:none;width:52px;text-align:center;white-space:nowrap;
+  cursor:pointer;flex:none;width:44px;text-align:center;white-space:nowrap;
   font-variant-numeric:tabular-nums;touch-action:manipulation}
 .atchip:hover{border-color:var(--accent);color:var(--accent-ink)}
 .atchip.set{border-style:solid;border-color:var(--line);background:var(--surface-2);color:var(--ink-2)}
@@ -366,6 +379,13 @@ button,.row,.chip,.tabs button,.condpick button,.seg button,.dowpick button{
   color:var(--ink-2);font:inherit;font-size:12.5px;font-weight:600;padding:8px 4px;
   border-radius:7px;cursor:pointer;transition:.13s}
 .seg button[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--bg)}
+/* the tier buttons light up in their own colour, so the stripe on a row is
+   learned at the moment the tier is chosen — the 일간 row no longer spells
+   Easy/Med/Hard out, and this is where that mapping gets taught */
+.seg button[data-t="0"][aria-pressed="true"]{background:var(--ink-3);border-color:var(--ink-3)}
+.seg button[data-t="1"][aria-pressed="true"]{background:var(--q1);border-color:var(--q1)}
+.seg button[data-t="2"][aria-pressed="true"]{background:var(--q2);border-color:var(--q2)}
+.seg button[data-t="3"][aria-pressed="true"]{background:var(--q3);border-color:var(--q3)}
 .seg button:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
 .dowpick{display:grid;grid-template-columns:repeat(7,1fr);gap:4px}
 .dowpick button{appearance:none;border:1px solid var(--line);background:var(--bg);color:var(--ink-3);
@@ -2429,15 +2449,14 @@ function taskRow(t, ds){
   var h = "";
   var on = doneOn(ds,t.id);
   var mins = minsFor(ds, t.id);
-  h += '<div class="row'+(on?' on':'')+(flashId===t.id?' flash':'')+'" role="button" tabindex="0" data-act="toggle" data-id="'+t.id+'" data-d="'+ds+'">'
+  h += '<div class="row tl'+(t.tier?' q'+t.tier:'')+(on?' on':'')+(flashId===t.id?' flash':'')+'"'
+     + ' role="button" tabindex="0" data-act="toggle" data-id="'+t.id+'" data-d="'+ds+'">'
      + atChip(t)
      + chk() + '<div class="ttl">'+ esc(t.title) +'</div>'
      + (t.repeat==="weekly" ? '<div class="dayspec">'+ t.days.map(function(x){return DOW[x];}).join("") +'</div>' : '')
-     + '<div class="tier t'+t.tier+'">'+ TNAME[t.tier] +' '+ PTS[t.tier] +'</div>'
      + (on ? '<button class="tchip'+(mins?' set':'')+'" data-act="timeopen" data-id="'+t.id+'" data-d="'+ds+'">'
        + (mins ? hm(mins) : '+시간') +'</button>' : '')
-     + editBtn(t.id)
-     + (t.repeat !== "weekly" ? delBtn(t.id) : '') +'</div>';
+     + editBtn(t.id) +'</div>';
 
   if (timingId === t.id){
     h += '<div class="tpick"><div class="tpl">얼마나 걸렸어?</div><div class="tprow">'
@@ -2482,6 +2501,8 @@ function editRow(t){
        + '</div>';
   }
   h += '<div class="editbtns">'
+     + (t.repeat !== "weekly"
+         ? '<button class="ghost danger" data-act="del" data-id="'+ t.id +'">삭제</button>' : '')
      + '<button class="ghost" data-act="canceledit">취소</button>'
      + '<button class="save" data-act="saveedit" data-id="'+ t.id +'">저장</button>'
      + '</div></div>';
@@ -4355,7 +4376,9 @@ function doAct(act, n){
     for (var d in S.log){ delete S.log[d][tid]; if (!Object.keys(S.log[d]).length) delete S.log[d]; }
     /* its minutes go with it, or they keep counting toward daily totals */
     for (var d2 in S.time){ delete S.time[d2][tid]; if (!Object.keys(S.time[d2]).length) delete S.time[d2]; }
-    timingId = null; save(); render(); return;
+    timingId = atId = null;
+    if (editingId === tid) editingId = null;     /* 삭제 can now be pressed from inside the editor */
+    save(); render(); return;
   }
   if (act === "ctreset"){ S.condTarget = null; save(); render2("settings"); return; }
   if (act === "add"){
