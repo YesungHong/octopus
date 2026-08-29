@@ -285,6 +285,36 @@ button,.row,.chip,.tabs button,.condpick button,.seg button,.dowpick button{
   background:color-mix(in srgb,var(--t2) 10%,transparent)}
 .tchip:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 
+/* ── timeline ─────────────────────────────────────────────────── */
+/* fixed-width gutter so the times line up into a column and the list reads
+   as a schedule; the ＋시각 affordance has to stay visible because touch
+   devices have no hover to reveal it */
+.atchip{appearance:none;border:1px dashed var(--line);background:transparent;color:var(--ink-3);
+  font-family:var(--font-num);font-size:11px;font-weight:600;padding:4px 0;border-radius:6px;
+  cursor:pointer;flex:none;width:52px;text-align:center;white-space:nowrap;
+  font-variant-numeric:tabular-nums;touch-action:manipulation}
+.atchip:hover{border-color:var(--accent);color:var(--accent-ink)}
+.atchip.set{border-style:solid;border-color:var(--line);background:var(--surface-2);color:var(--ink-2)}
+.row.on .atchip.set{border-color:var(--line-soft);background:transparent;color:var(--ink-3)}
+.atchip:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+.nowline{display:flex;align-items:center;gap:7px;margin:4px 0;pointer-events:none}
+.nowline::before{content:"";width:52px;height:1px;background:var(--accent);opacity:.45;flex:none}
+.nowline::after{content:"";flex:1;height:1px;background:var(--accent);opacity:.28}
+.nowline span{font-family:var(--font-num);font-size:10px;font-weight:650;letter-spacing:.06em;
+  color:var(--accent-ink);flex:none;font-variant-numeric:tabular-nums}
+
+.secdiv{font-size:10px;letter-spacing:.11em;color:var(--ink-3);margin:11px 0 3px;padding-left:8px}
+
+.tphint{margin-top:9px;font-size:11.5px;line-height:1.6;color:var(--ink-3)}
+.tphint b{color:var(--ink-2);font-weight:650}
+
+/* a row jumps to a new position the moment its time changes — light it so the
+   eye can follow where it went */
+@keyframes rowflash{from{background:var(--accent-soft)} to{background:transparent}}
+.row.flash{animation:rowflash 1.5s ease-out}
+@media (prefers-reduced-motion:reduce){ .row.flash{animation:none;background:var(--accent-soft)} }
+
 .tpick{margin:2px 0 6px;padding:12px;border-radius:10px;background:var(--surface-2);
   border:1px solid var(--line)}
 .tpl{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-3);margin-bottom:9px}
@@ -1552,6 +1582,30 @@ function oneOffDate(id){
   return null;
 }
 
+/* ───────── scheduled time ─────────
+   t.at is "HH:MM" or absent. It is a property of the task itself, so editing it
+   on a weekly routine moves that routine on every day it runs — a one-day
+   exception is a 그날 전용 task instead. Absent = 시간 미정, which is a normal
+   state, not a missing value: most ledger items never get a time. */
+function atMin(t){
+  if (!t || !t.at) return null;
+  var p = t.at.split(":");
+  return (+p[0]) * 60 + (+p[1]);
+}
+function nowMin(){
+  var n = new Date();
+  return n.getHours() * 60 + n.getMinutes();
+}
+function setAt(id, v){
+  var t = taskById(id);
+  if (!t){ atId = null; render(); return; }
+  if (v) t.at = v; else delete t.at;
+  atId = null;
+  flashId = id;                    /* the row is about to jump; light it so it can be followed */
+  save(); render();
+  setTimeout(function(){ flashId = null; }, 1600);
+}
+
 /* ───────── rendering ───────── */
 var view = "day";
 var dayOffset = 0;                                  /* 0 = today, negative = past */
@@ -2290,34 +2344,7 @@ function viewDay(d){
   if (!list.length){
     h += '<div class="empty">오늘 잡힌 게 없어.<br><b>전체</b> 탭에서 할 일을 적어두면 여기 자동으로 떠.</div>';
   } else {
-    h += '<div class="list">';
-    list.forEach(function(t){
-      if (t.id === editingId){ h += editRow(t); return; }
-      var on = doneOn(ds,t.id);
-      var mins = minsFor(ds, t.id);
-      h += '<div class="row'+(on?' on':'')+'" role="button" tabindex="0" data-act="toggle" data-id="'+t.id+'" data-d="'+ds+'">'
-         + chk() + '<div class="ttl">'+ esc(t.title) +'</div>'
-         + (t.repeat==="weekly" ? '<div class="dayspec">'+ t.days.map(function(x){return DOW[x];}).join("") +'</div>' : '')
-         + '<div class="tier t'+t.tier+'">'+ TNAME[t.tier] +' '+ PTS[t.tier] +'</div>'
-         + (on ? '<button class="tchip'+(mins?' set':'')+'" data-act="timeopen" data-id="'+t.id+'" data-d="'+ds+'">'
-               + (mins ? hm(mins) : '+시간') +'</button>' : '')
-         + editBtn(t.id)
-         + (t.repeat !== "weekly" ? delBtn(t.id) : '') +'</div>';
-
-      if (timingId === t.id){
-        h += '<div class="tpick"><div class="tpl">얼마나 걸렸어?</div><div class="tprow">'
-           + [15,30,45,60,90,120,180].map(function(v){
-               return '<button data-act="tset" data-v="'+v+'" data-d="'+ds+'"'
-                    + (mins===v?' aria-pressed="true"':'') +'>'+ (v<60? v+'분' : hm(v)) +'</button>';
-             }).join("")
-           + '</div><div class="tprow custom">'
-           + '<input type="number" id="tcustom" min="1" max="1440" inputmode="numeric" placeholder="직접 (분)" value="">'
-           + '<button data-act="tsetc" data-d="'+ds+'">확인</button>'
-           + (mins ? '<button class="clr" data-act="tset" data-v="0" data-d="'+ds+'">지우기</button>' : '')
-           + '</div></div>';
-      }
-    });
-    h += '</div>';
+    h += '<div class="list">' + timeline(list, ds, isToday) + '</div>';
   }
 
   /* quick-add — lives only on this date */
@@ -2334,6 +2361,82 @@ function viewDay(d){
   h += '<button class="jump" data-act="compare">오늘 하루 보고서</button>';
   return h;
 }
+/* The quest list IS the timeline: sorted by t.at, 지금 spliced in where it falls,
+   and the untimed ones parked underneath. A row sitting above the 지금 line is
+   not marked, nagged, or coloured — a past time is just a past time. */
+function timeline(list, ds, isToday){
+  var timed = list.filter(function(t){ return !!t.at; })
+                  .sort(function(a,b){ return atMin(a) - atMin(b); });
+  var loose = list.filter(function(t){ return !t.at; });
+
+  var h = "", now = (isToday && timed.length) ? nowMin() : null, drawn = false;
+  timed.forEach(function(t){
+    if (now !== null && !drawn && atMin(t) > now){ h += nowLine(now); drawn = true; }
+    h += taskRow(t, ds);
+  });
+  if (now !== null && !drawn) h += nowLine(now);         /* the whole day is behind us */
+  if (timed.length && loose.length) h += '<div class="secdiv">시간 미정</div>';
+  loose.forEach(function(t){ h += taskRow(t, ds); });
+  return h;
+}
+function nowLine(m){
+  return '<div class="nowline"><span>지금 '+ clock(m) +'</span></div>';
+}
+function clock(m){
+  var hh = Math.floor(m/60), mm = m % 60;
+  return (hh<10?"0":"") + hh + ":" + (mm<10?"0":"") + mm;
+}
+function atChip(t){
+  return '<button class="atchip'+(t.at?' set':'')+'" data-act="atopen" data-id="'+t.id+'"'
+       + ' aria-label="'+ (t.at ? t.at+'에 예정, 시각 고치기' : '시각 정하기') +'">'
+       + (t.at ? t.at : '＋시각') +'</button>';
+}
+function atPicker(t){
+  return '<div class="tpick"><div class="tpl">언제까지?</div><div class="tprow">'
+       + ["09:00","12:00","14:00","18:00","21:00"].map(function(v){
+           return '<button data-act="atset" data-v="'+v+'"'
+                + (t.at===v?' aria-pressed="true"':'') +'>'+ v +'</button>';
+         }).join("")
+       + '</div><div class="tprow custom">'
+       + '<input type="time" id="atcustom" value="'+ (t.at || "") +'">'
+       + '<button data-act="atsetc">확인</button>'
+       + (t.at ? '<button class="clr" data-act="atset" data-v="">지우기</button>' : '')
+       + '</div><div class="tphint">시각을 고치면 순서도 같이 옮겨가.'
+       + (t.repeat==="weekly" ? ' 이건 매주 반복이라 <b>돌아오는 날 전부</b>에 적용돼.' : '')
+       + '</div></div>';
+}
+
+function taskRow(t, ds){
+  if (t.id === editingId) return editRow(t);
+  var h = "";
+  var on = doneOn(ds,t.id);
+  var mins = minsFor(ds, t.id);
+  h += '<div class="row'+(on?' on':'')+(flashId===t.id?' flash':'')+'" role="button" tabindex="0" data-act="toggle" data-id="'+t.id+'" data-d="'+ds+'">'
+     + atChip(t)
+     + chk() + '<div class="ttl">'+ esc(t.title) +'</div>'
+     + (t.repeat==="weekly" ? '<div class="dayspec">'+ t.days.map(function(x){return DOW[x];}).join("") +'</div>' : '')
+     + '<div class="tier t'+t.tier+'">'+ TNAME[t.tier] +' '+ PTS[t.tier] +'</div>'
+     + (on ? '<button class="tchip'+(mins?' set':'')+'" data-act="timeopen" data-id="'+t.id+'" data-d="'+ds+'">'
+       + (mins ? hm(mins) : '+시간') +'</button>' : '')
+     + editBtn(t.id)
+     + (t.repeat !== "weekly" ? delBtn(t.id) : '') +'</div>';
+
+  if (timingId === t.id){
+    h += '<div class="tpick"><div class="tpl">얼마나 걸렸어?</div><div class="tprow">'
+       + [15,30,45,60,90,120,180].map(function(v){
+           return '<button data-act="tset" data-v="'+v+'" data-d="'+ds+'"'
+                + (mins===v?' aria-pressed="true"':'') +'>'+ (v<60? v+'분' : hm(v)) +'</button>';
+         }).join("")
+       + '</div><div class="tprow custom">'
+       + '<input type="number" id="tcustom" min="1" max="1440" inputmode="numeric" placeholder="직접 (분)" value="">'
+       + '<button data-act="tsetc" data-d="'+ds+'">확인</button>'
+       + (mins ? '<button class="clr" data-act="tset" data-v="0" data-d="'+ds+'">지우기</button>' : '')
+       + '</div></div>';
+  }
+  if (atId === t.id) h += atPicker(t);
+  return h;
+}
+
 function chk(){ return '<div class="box"><svg viewBox="0 0 12 12"><polyline points="1.5,6.5 4.5,9.5 10.5,2.5"/></svg></div>'; }
 
 function editBtn(id){
@@ -3768,6 +3871,8 @@ var draft = { tier:2, repeat:"once", days:[] };
 var editingId = null, edraft = { tier:2, days:[] };
 var editingCond = false, cdraftDate = null;
 var timingId = null;
+var atId = null;                                    /* row whose 시각 picker is open */
+var flashId = null;                                 /* row that just moved, briefly lit */
 var cdraft = { sleep:"", wake:"", score:0 };
 
 function exportBoard(){
@@ -3854,6 +3959,13 @@ function wire(){
       if (ev.key === "Enter"){ ev.preventDefault(); doAct("add"); }
     });
   }
+
+  /* the time wheel commits as soon as it is dismissed — 확인 is only a fallback
+     for browsers that fire no change event until blur */
+  var atc = el("atcustom");
+  if (atc) atc.addEventListener("change", function(){
+    if (atc.value && atId) setAt(atId, atc.value);
+  });
 
   /* inline editor pickers */
   var eTier = el("etier"), eDays = el("edays"), eBox = el("et");
@@ -4122,7 +4234,19 @@ function doAct(act, n){
   }
   if (act === "timeopen"){
     timingId = (timingId === n.dataset.id) ? null : n.dataset.id;
+    atId = null;
     render(); return;
+  }
+  if (act === "atopen"){
+    atId = (atId === n.dataset.id) ? null : n.dataset.id;
+    timingId = null;
+    render(); return;
+  }
+  if (act === "atset"){ setAt(atId, n.dataset.v); return; }
+  if (act === "atsetc"){
+    var ab = el("atcustom");
+    if (!ab || !ab.value){ ab && ab.focus(); return; }
+    setAt(atId, ab.value); return;
   }
   if (act === "tset"){
     if (timingId){ setMins(n.dataset.d, timingId, +n.dataset.v); save(); }
@@ -4201,8 +4325,8 @@ function doAct(act, n){
     cdraft = { sleep:"", wake:"", score:0 };
     editingCond = false; save(); render(); return;
   }
-  if (act === "prevday"){ if (dayOffset > -3650){ dayOffset--; timingId = null; render(); } return; }
-  if (act === "nextday"){ if (dayOffset <  365){ dayOffset++; timingId = null; render(); } return; }
+  if (act === "prevday"){ if (dayOffset > -3650){ dayOffset--; timingId = atId = null; render(); } return; }
+  if (act === "nextday"){ if (dayOffset <  365){ dayOffset++; timingId = atId = null; render(); } return; }
   if (act === "jumptoday"){ dayOffset = 0; render(); return; }
   if (act === "prevweek"){ if (weekOffset > -520){ weekOffset--; render(); } return; }
   if (act === "nextweek"){ if (weekOffset <   52){ weekOffset++; render(); } return; }
