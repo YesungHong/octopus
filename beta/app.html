@@ -4376,7 +4376,11 @@ function doAct(act, n){
     timingId = null; render(); return;
   }
   if (act === "del"){
-    var tid = n.dataset.id;
+    var tid = n.dataset.id, dt = taskById(tid);
+    /* deleting takes the check history and the study minutes with it, which is not
+       obvious from a × — say so before it happens rather than after */
+    if (!confirm("「" + (dt ? dt.title : "이 할 일") + "」 지울까?\n\n"
+               + "체크 기록과 붙여둔 공부 시간도 같이 사라져.")) return;
     S.tasks = S.tasks.filter(function(t){ return t.id !== tid; });
     for (var d in S.log){ delete S.log[d][tid]; if (!Object.keys(S.log[d]).length) delete S.log[d]; }
     /* its minutes go with it, or they keep counting toward daily totals */
