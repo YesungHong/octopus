@@ -3638,7 +3638,85 @@ function viewAll(){
      + '<button class="addbtn" id="addbtn" data-act="add">추가</button>'
      + '</div></div>';
 
+  h += '<div class="card"><h2>공부 시간 추이<em>세로축 시간</em></h2>'
+     + studyChart() + '</div>';
+
   return h;
+}
+
+/* 공부 시간을 날짜 위에 점으로. 수면 추이와 같은 읽는 법이지만 두 가지가 다르다:
+   창이 최근 14일이 아니라 기록이 있는 전 기간이고(전체 탭의 값은 긴 시각이다),
+   x가 인덱스가 아니라 실제 날짜다 — 비워둔 날을 압축하면 공백이 사라져서
+   "쉬었다"가 그래프에서 지워진다. 선은 긋지 않는다: 하루치 공부 시간은 이어지는
+   양이 아니라 그날 하나씩 찍히는 값이다. */
+function fromIso(ds){ var p = ds.split("-"); return new Date(+p[0], +p[1]-1, +p[2]); }
+
+function studyChart(){
+  var days = [];
+  for (var ds in S.time){
+    var mn = minsOn(ds);
+    if (mn > 0) days.push({ ds: ds, d: fromIso(ds), mins: mn });
+  }
+  days.sort(function(a,b){ return a.ds < b.ds ? -1 : (a.ds > b.ds ? 1 : 0); });
+  if (!days.length){
+    return '<div class="need">아직 시간 기록이 없어. 일간에서 퀘스트를 체크하면 <b>+시간</b> 칩이 생겨.</div>';
+  }
+
+  var W = 320, H = 132, pl = 24, pr = 8, pt_ = 10, pb = 20;
+  var n = days.length;
+  var span = Math.round((days[n-1].d - days[0].d) / 86400000);
+  var maxH = Math.max.apply(null, days.map(function(p){ return p.mins/60; }));
+  var top  = Math.max(1, Math.ceil(maxH));
+  var X = function(p){
+    return span <= 0 ? pl + (W-pl-pr)/2
+                     : pl + Math.round((p.d - days[0].d)/86400000) * (W-pl-pr)/span;
+  };
+  var Y = function(hrs){ return pt_ + (1 - hrs/top) * (H-pt_-pb); };
+  var avgM = mean(days.map(function(p){ return p.mins; }));
+
+  var s = '<svg class="schart" viewBox="0 0 '+W+' '+H+'" role="img" '
+        + 'aria-label="날짜별 공부 시간, 기록 있는 '+n+'일">';
+
+  [0, top/2, top].forEach(function(v){
+    s += '<line x1="'+pl+'" y1="'+Y(v).toFixed(1)+'" x2="'+(W-pr)+'" y2="'+Y(v).toFixed(1)+'" '
+       + 'stroke="var(--line-soft)" stroke-width="1"/>'
+       + '<text x="'+(pl-5)+'" y="'+(Y(v)+3.5).toFixed(1)+'" text-anchor="end" '
+       + 'font-size="8" fill="var(--ink-3)">'+ (v % 1 ? v.toFixed(1) : v) +'</text>';
+  });
+
+  /* the user's own average — a description of what they do, not a line to clear */
+  s += '<line x1="'+pl+'" y1="'+Y(avgM/60).toFixed(1)+'" x2="'+(W-pr)+'" y2="'+Y(avgM/60).toFixed(1)+'" '
+     + 'stroke="var(--accent)" stroke-width="1" stroke-dasharray="3 3" opacity=".7"/>'
+     + '<text x="'+(W-pr)+'" y="'+(Y(avgM/60)-4).toFixed(1)+'" text-anchor="end" '
+     + 'font-size="8" fill="var(--accent-ink)">평균 '+ hm(Math.round(avgM)) +'</text>';
+
+  days.forEach(function(p){
+    s += '<circle cx="'+X(p).toFixed(1)+'" cy="'+Y(p.mins/60).toFixed(1)+'" r="2.8" '
+       + 'fill="var(--t2)" opacity=".85"><title>'+ md(p.d) +' · '+ hm(p.mins) +'</title></circle>';
+  });
+
+  /* ticks are chosen by position, not by index: with a long gap the middle
+     record can sit almost on top of the first one and the two labels collide */
+  var ticks = [0];
+  if (n > 1){
+    var xa = X(days[0]), xb = X(days[n-1]), mid = -1, best = 1e9;
+    for (var q=1;q<n-1;q++){
+      var dist = Math.abs(X(days[q]) - (xa+xb)/2);
+      if (dist < best){ best = dist; mid = q; }
+    }
+    if (mid >= 0 && X(days[mid]) - xa > 40 && xb - X(days[mid]) > 40) ticks.push(mid);
+    ticks.push(n-1);
+  }
+  ticks.forEach(function(i){
+    s += '<text x="'+X(days[i]).toFixed(1)+'" y="'+(H-6)+'" text-anchor="'
+       + (i===0 ? 'start' : (i===n-1 ? 'end' : 'middle')) +'" '
+       + 'font-size="8" fill="var(--ink-3)">'+ md(days[i].d) +'</text>';
+  });
+  s += '</svg>';
+
+  s += '<div class="slegend"><span>점 하나 = 그날 공부한 시간</span>'
+     + '<span class="lr">'+ (span<=0 ? '하루' : span+1+'일 폭') +'</span></div>';
+  return s;
 }
 
 /* ── 설정 ── */
