@@ -3581,6 +3581,8 @@ function viewAll(){
   var pct  = totP ? Math.round(gotP/totP*100) : 0;
 
   var h = gachaCard();
+  h += '<div class="card"><h2>공부 시간 추이<em>세로축 시간</em></h2>'
+     + studyChart() + '</div>';
   h += '<div class="card"><h2>한 번짜리</h2>';
   if (!once.length){
     h += '<div class="empty">아직 없어. 아래에서 추가해봐.</div>';
@@ -3637,9 +3639,6 @@ function viewAll(){
      +   '<input type="time" id="nat" value=""></label></div>'
      + '<button class="addbtn" id="addbtn" data-act="add">추가</button>'
      + '</div></div>';
-
-  h += '<div class="card"><h2>공부 시간 추이<em>세로축 시간</em></h2>'
-     + studyChart() + '</div>';
 
   return h;
 }
