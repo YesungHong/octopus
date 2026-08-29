@@ -251,12 +251,13 @@ button,.row,.chip,.tabs button,.condpick button,.seg button,.dowpick button{
    Checked rows fade their outline — they are done, they should stop asking. */
 .row.tl{gap:8px;padding:10px;margin-bottom:5px;
   box-shadow:inset 0 0 0 1px var(--line-soft)}
-.row.tl.q1{box-shadow:inset 0 0 0 1px var(--q1)}
-.row.tl.q2{box-shadow:inset 0 0 0 1px var(--q2)}
-.row.tl.q3{box-shadow:inset 0 0 0 1px var(--q3)}
-.row.tl.on.q1{box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--q1) 40%,transparent)}
-.row.tl.on.q2{box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--q2) 40%,transparent)}
-.row.tl.on.q3{box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--q3) 40%,transparent)}
+/* the colour lives in the checkbox alone. Outlining whole rows put a saturated
+   frame around every line at once and the list stopped reading as a list.
+   Only unchecked boxes carry it — that is the moment the tier is being weighed;
+   once checked the box goes green like every other done thing. 일정 0 stays grey. */
+.row.tl:not(.on).q1 .box{border-color:var(--q1);background:color-mix(in srgb,var(--q1) 13%,transparent)}
+.row.tl:not(.on).q2 .box{border-color:var(--q2);background:color-mix(in srgb,var(--q2) 13%,transparent)}
+.row.tl:not(.on).q3 .box{border-color:var(--q3);background:color-mix(in srgb,var(--q3) 13%,transparent)}
 .row .ttl{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:14px}
 .row.on .ttl{color:var(--ink-3);text-decoration:line-through;text-decoration-thickness:1px}
 .tier{font-family:var(--font-num);font-size:10px;font-weight:700;letter-spacing:.04em;
