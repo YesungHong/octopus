@@ -295,13 +295,8 @@ button,.row,.chip,.tabs button,.condpick button,.seg button,.dowpick button{
    devices have no hover to reveal it */
 .atchip{appearance:none;border:1px dashed var(--line);background:transparent;color:var(--ink-3);
   font-family:var(--font-num);font-size:11px;font-weight:600;padding:4px 0;border-radius:6px;
-  cursor:pointer;flex:none;width:52px;white-space:nowrap;line-height:1.25;
-  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  cursor:pointer;flex:none;width:52px;text-align:center;white-space:nowrap;
   font-variant-numeric:tabular-nums;touch-action:manipulation}
-/* 마칠 시각 stacks under the start rather than widening the gutter — on a phone a
-   "14:00–16:00" one-liner eats the title's room */
-.atchip b{font-weight:600}
-.atchip i{font-style:normal;font-size:9.5px;font-weight:500;opacity:.6;margin-top:1px}
 .atchip:hover{border-color:var(--accent);color:var(--accent-ink)}
 .atchip.set{border-style:solid;border-color:var(--line);background:var(--surface-2);color:var(--ink-2)}
 .row.on .atchip.set{border-color:var(--line-soft);background:transparent;color:var(--ink-3)}
@@ -315,8 +310,10 @@ button,.row,.chip,.tabs button,.condpick button,.seg button,.dowpick button{
 
 .secdiv{font-size:10px;letter-spacing:.11em;color:var(--ink-3);margin:11px 0 3px;padding-left:8px}
 
-.tprow.plus{margin-top:9px}
-.tprow.plus button{flex:1;font-size:11.5px;padding:8px 4px;color:var(--ink-3)}
+.timegrid.one{grid-template-columns:1fr}
+.natbox label{flex-direction:row;align-items:center;gap:10px}
+.natbox label em{font-style:normal;flex:1;font-size:11px;opacity:.75}
+.natbox input{width:auto;flex:none;min-width:112px;font-size:15px;padding:9px 11px}
 .tpick .submitrow{margin-top:11px}
 .tpick .submitrow button{font-size:13px;padding:10px;border-radius:8px}
 .tphint{margin-top:9px;font-size:11.5px;line-height:1.6;color:var(--ink-3)}
@@ -1613,22 +1610,17 @@ function nowMin(){
   var n = new Date();
   return n.getHours() * 60 + n.getMinutes();
 }
-/* 마칠 시각 is optional and only meaningful next to a start, so a lone t.to is
-   never stored. Ordering keys off t.at alone — t.to is shown, not sorted on. */
-function applyAt(id, at, to){
+/* One time per task and it is the finish time — 끝낼 시각. A start time was tried
+   and taken back out: it doubles the typing, and what the user watches for is the
+   line they wanted to be done by, not the moment they meant to begin. */
+function applyAt(id, at){
   var t = taskById(id);
   if (!t){ atId = null; render(); return; }
-  if (at) t.at = at; else { delete t.at; delete t.to; }
-  if (at && to) t.to = to; else delete t.to;
+  if (at) t.at = at; else delete t.at;
   atId = null;
   flashId = id;                    /* the row is about to jump; light it so it can be followed */
   save(); render();
   setTimeout(function(){ flashId = null; }, 1600);
-}
-function addMin(hhmm, mins){
-  var p = hhmm.split(":"), m = (+p[0])*60 + (+p[1]) + mins;
-  if (m > 23*60+59) m = 23*60+59;              /* no wrap: a day ends at midnight here */
-  return clock(m);
 }
 
 /* ───────── rendering ───────── */
@@ -2380,6 +2372,8 @@ function viewDay(d){
      +   '<button data-t="1" aria-pressed="false">Easy 1</button>'
      +   '<button data-t="2" aria-pressed="true">Med 2</button>'
      +   '<button data-t="3" aria-pressed="false">Hard 3</button></div>'
+     + '<div class="timegrid one natbox"><label>끝낼 시각 <em>안 정해도 돼</em>'
+     +   '<input type="time" id="nat" value=""></label></div>'
      + '<button class="addbtn" data-act="add">추가</button>'
      + '</div>';
 
@@ -2413,27 +2407,19 @@ function clock(m){
   return (hh<10?"0":"") + hh + ":" + (mm<10?"0":"") + mm;
 }
 function atChip(t){
-  var lab = t.at ? ('<b>'+ t.at +'</b>' + (t.to ? '<i>'+ t.to +'</i>' : '')) : '＋시각';
-  var say = t.at ? (t.at + (t.to ? '부터 '+t.to+'까지' : '에 예정') + ', 시각 고치기') : '시각 정하기';
   return '<button class="atchip'+(t.at?' set':'')+'" data-act="atopen" data-id="'+t.id+'"'
-       + ' aria-label="'+ say +'">'+ lab +'</button>';
+       + ' aria-label="'+ (t.at ? t.at+'까지, 끝낼 시각 고치기' : '끝낼 시각 정하기') +'">'
+       + (t.at ? t.at : '＋시각') +'</button>';
 }
 function atPicker(t){
-  return '<div class="tpick"><div class="tpl">언제</div>'
-       + '<div class="timegrid">'
-       +   '<label>시작 시각<input type="time" id="atFrom" value="'+ atDraft.at +'"></label>'
-       +   '<label>마칠 시각<input type="time" id="atTo" value="'+ atDraft.to +'"></label>'
-       + '</div>'
-       + '<div class="tprow plus">'
-       +   [[30,"+30분"],[60,"+1시간"],[90,"+1시간반"],[120,"+2시간"]].map(function(v){
-             return '<button data-act="atplus" data-v="'+v[0]+'">'+ v[1] +'</button>';
-           }).join("")
-       + '</div>'
+  return '<div class="tpick">'
+       + '<div class="timegrid one"><label>끝낼 시각'
+       +   '<input type="time" id="atFrom" value="'+ (t.at || "") +'"></label></div>'
        + '<div class="submitrow">'
        +   (t.at ? '<button class="ghost" data-act="atclear">지우기</button>' : '')
        +   '<button class="submit" data-act="atsave">확인</button>'
        + '</div>'
-       + '<div class="tphint">마칠 시각은 안 적어도 돼. 시각을 고치면 순서도 같이 옮겨가.'
+       + '<div class="tphint">시각을 고치면 순서도 같이 옮겨가.'
        + (t.repeat==="weekly" ? ' 이건 매주 반복이라 <b>돌아오는 날 전부</b>에 적용돼.' : '')
        + '</div></div>';
 }
@@ -3647,6 +3633,8 @@ function viewAll(){
      + '<div class="dowpick hide" id="ndays">'
      +   DOW.map(function(n,i){ return '<button data-d="'+i+'" aria-pressed="false">'+n+'</button>'; }).join("")
      + '</div>'
+     + '<div class="timegrid one natbox"><label>끝낼 시각 <em>안 정해도 돼</em>'
+     +   '<input type="time" id="nat" value=""></label></div>'
      + '<button class="addbtn" id="addbtn" data-act="add">추가</button>'
      + '</div></div>';
 
@@ -3905,7 +3893,6 @@ var editingId = null, edraft = { tier:2, days:[] };
 var editingCond = false, cdraftDate = null;
 var timingId = null;
 var atId = null;                                    /* row whose 시각 picker is open */
-var atDraft = { at:"", to:"" };                      /* 시작 / 마칠, uncommitted */
 var flashId = null;                                 /* row that just moved, briefly lit */
 var cdraft = { sleep:"", wake:"", score:0 };
 
@@ -3994,11 +3981,6 @@ function wire(){
     });
   }
 
-  /* two fields now, so nothing is written until 확인 — same shape as 컨디션's 제출.
-     These only keep the draft in step so a +N분 tap sees a freshly spun wheel. */
-  var aF = el("atFrom"), aT = el("atTo");
-  if (aF) aF.addEventListener("input", function(){ atDraft.at = aF.value; });
-  if (aT) aT.addEventListener("input", function(){ atDraft.to = aT.value; });
 
   /* inline editor pickers */
   var eTier = el("etier"), eDays = el("edays"), eBox = el("et");
@@ -4271,31 +4253,14 @@ function doAct(act, n){
     render(); return;
   }
   if (act === "atopen"){
-    var wasOpen = (atId === n.dataset.id);
-    atId = wasOpen ? null : n.dataset.id;
+    atId = (atId === n.dataset.id) ? null : n.dataset.id;
     timingId = null;
-    if (!wasOpen){
-      var ot = taskById(atId);
-      atDraft = { at: (ot && ot.at) || "", to: (ot && ot.to) || "" };
-    }
     render(); return;
   }
-  if (act === "atplus"){
-    var pf = el("atFrom"), pt = el("atTo");
-    if (!pf || !pf.value){ toast("시작 시각을 먼저 정해줘"); pf && pf.focus(); return; }
-    atDraft.at = pf.value;
-    atDraft.to = addMin(pf.value, +n.dataset.v);
-    if (pt) pt.value = atDraft.to;               /* no re-render — keeps the wheels put */
-    return;
-  }
-  if (act === "atclear"){ applyAt(atId, "", ""); return; }
+  if (act === "atclear"){ applyAt(atId, ""); return; }
   if (act === "atsave"){
-    var sf = el("atFrom"), st = el("atTo");
-    var av = sf ? sf.value : "", tv = st ? st.value : "";
-    if (!av && !tv){ applyAt(atId, "", ""); return; }
-    if (!av){ toast("시작 시각을 먼저 정해줘"); sf && sf.focus(); return; }
-    if (tv && tv <= av){ toast("마칠 시각이 시작보다 빠르네"); st && st.focus(); return; }
-    applyAt(atId, av, tv); return;
+    var sf = el("atFrom");
+    applyAt(atId, sf ? sf.value : ""); return;
   }
   if (act === "tset"){
     if (timingId){ setMins(n.dataset.d, timingId, +n.dataset.v); save(); }
@@ -4322,14 +4287,18 @@ function doAct(act, n){
     /* added from 일간 → belongs to that date only; from 전체 → ledger item */
     var rep = (view === "day") ? "day" : draft.repeat;
     if (rep === "weekly" && !draft.days.length){ toast("요일을 하나는 골라줘"); return; }
-    S.tasks.push({
+    var natEl = el("nat"), atv = natEl ? natEl.value : "";
+    var fresh = {
       id: "t" + (S.tasks.length ? (Math.max.apply(null, S.tasks.map(function(t){ return +t.id.slice(1)||0; }))+1) : 1),
       title: title, tier: draft.tier,
       repeat: rep,
       date: rep === "day" ? iso(cursorDay()) : undefined,
       days: rep === "weekly" ? draft.days.slice().sort() : []
-    });
+    };
+    if (atv) fresh.at = atv;          /* left blank = 시간 미정, which is a normal state */
+    S.tasks.push(fresh);
     nt.value = ""; draft.days = [];
+    if (natEl) natEl.value = "";
     save(); render();
     el("nt") && el("nt").focus();
     return;
