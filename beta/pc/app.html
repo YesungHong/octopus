@@ -300,6 +300,22 @@ button,.row,.chip,.tabs button,.condpick button,.seg button,.dowpick button{
 .empty{padding:22px 8px;text-align:center;color:var(--ink-3);font-size:13px;line-height:1.7}
 
 /* ── study time ───────────────────────────────────────────────── */
+/* the stopwatch sits in the slot a finished row uses for +시간, so an unfinished
+   row gains a control without the row gaining any width */
+.tchip.sw{font-family:var(--font-num);min-width:34px}
+.tchip.sw.run{border-style:solid;border-color:var(--accent);color:var(--accent-ink);
+  background:var(--accent-soft);font-variant-numeric:tabular-nums;min-width:54px}
+.swask{display:flex;align-items:center;flex-wrap:wrap;gap:7px;margin:2px 0 9px;padding:9px 11px;
+  border-radius:9px;background:var(--surface-2);font-size:12.5px;color:var(--ink-2)}
+.swask button{appearance:none;border:1px solid var(--accent);background:var(--accent);color:var(--bg);
+  font:inherit;font-size:12px;font-weight:650;padding:6px 10px;border-radius:7px;cursor:pointer}
+.swask button.ghost{background:transparent;border-color:var(--line);color:var(--ink-3)}
+.swrun-note{display:flex;align-items:center;gap:8px;margin-bottom:12px;padding:9px 12px;
+  border-radius:9px;background:var(--accent-soft);border:1px solid var(--accent);
+  font-size:12.5px;color:var(--accent-ink)}
+.swrun-note button{margin-left:auto;appearance:none;border:1px solid var(--accent);
+  background:transparent;color:var(--accent-ink);font:inherit;font-size:12px;font-weight:650;
+  padding:5px 10px;border-radius:7px;cursor:pointer;flex:none}
 .tchip{appearance:none;border:1px dashed var(--line);background:transparent;color:var(--ink-3);
   font-family:var(--font-num);font-size:11px;font-weight:600;padding:4px 8px;border-radius:6px;
   cursor:pointer;flex:none;white-space:nowrap;touch-action:manipulation}
@@ -1408,6 +1424,7 @@ function blank(){
     aptitV: 2,                   /* 연습 회차 버전 — 2 = 유형별 */
     aptexV: 2,                   /* 시험 회차 버전 — 2 = 영역별 */
     gacha: { used:0, dex:{}, hold:{}, last:null },
+    sw: null,                    /* 스톱워치 {id, ds, t0} — 시작 시각만 들고 있어 새로고침을 견딘다 */
     pet: true,                   /* 모은 캐릭터가 화면 아래를 돌아다닌다 */
     petPick: null                /* {k,id} — 산책할 애는 직접 고른다 */
   };
@@ -2394,7 +2411,8 @@ function viewDay(d){
   var left = tgt - got;
 
   var isToday = ds === iso(today());
-  var h = '<div class="card">';
+  var h = swElsewhere(ds);
+  h += '<div class="card">';
   h += dayNav(d);
   h += '<div class="readout"><div class="big">'+ got +'<em>/'+ tgt +' pt</em></div>'
      +  '<div class="side">완료 <b>'+ doneList.length +'</b> / '+ list.length +'개<br>'
@@ -2545,6 +2563,16 @@ function dayBlurb(p){
 /* The quest list IS the timeline: sorted by t.at, 지금 spliced in where it falls,
    and the untimed ones parked underneath. A row sitting above the 지금 line is
    not marked, nagged, or coloured — a past time is just a past time. */
+/* A stopwatch left running on another date is invisible on this screen, and an
+   invisible running clock is how an hour gets attached to the wrong day. */
+function swElsewhere(ds){
+  if (!IS_PC || !S.sw || S.sw.ds === ds) return "";
+  var t = taskById(S.sw.id);
+  return '<div class="swrun-note">⏱ <b>'+ esc(t ? t.title : "할 일") +'</b> 가 '
+       + md(fromIso(S.sw.ds)) +' 에서 돌고 있어'
+       + '<button data-act="swstop">멈추기</button></div>';
+}
+
 function timeline(list, ds, isToday){
   var timed = list.filter(function(t){ return !!t.at; })
                   .sort(function(a,b){ return atMin(a) - atMin(b); });
@@ -2564,6 +2592,62 @@ function timeline(list, ds, isToday){
   loose.forEach(function(t){ h += taskRow(t, ds); });
   return h;
 }
+/* ───────── 스톱워치 (PC 전용) ─────────
+   PC 에만 두는 이유: 폰의 행은 이미 빡빡하고(8/29 제목이 56px 까지 눌렸던
+   그 행이다) 손가락으로 시작·멈춤을 눌러가며 재는 일도 드물다.
+
+   저장하는 건 시작 시각 하나뿐이라 탭을 닫았다 열어도 이어지고, 경과는
+   그때그때 빼서 구한다. 한 번에 하나만 돈다 — 두 가지 일을 동시에 하지는
+   않으니까, 새로 시작하면 돌던 것은 조용히 기록되고 멈춘다.
+
+   ★ 멈춰도 완료 체크는 하지 않는다 (유저 결정 A). 멈추는 이유가 늘
+   "다 했다"는 아니기 때문 — 잠깐 자리를 뜨는 쪽이 더 흔하다. 대신 멈춘
+   직후 그 행에 한 번만 물어본다. */
+var swAsk = null;                                  /* {id, ds, mins} — 멈춘 직후 한 줄 */
+function swRunning(id){ return !!(S.sw && S.sw.id === id); }
+function swSecs(){ return S.sw ? Math.max(0, Math.floor((Date.now() - S.sw.t0)/1000)) : 0; }
+function swText(sec){
+  var h = Math.floor(sec/3600), m = Math.floor(sec%3600/60), s = sec%60;
+  return h ? h + ":" + String(m).padStart(2,"0") + ":" + String(s).padStart(2,"0")
+           : m + ":" + String(s).padStart(2,"0");
+}
+function swStart(id, ds){
+  if (S.sw) swStop(true);
+  swAsk = null;
+  S.sw = { id:id, ds:ds, t0:Date.now() };
+  save(); render();
+}
+/* Rounds to the nearest minute because that is the unit the whole app records
+   in. Under 30 seconds rounds to 0 and nothing is written — a stopwatch that
+   was started by mistake should not leave a mark. */
+function swStop(quiet){
+  if (!S.sw) return 0;
+  var id = S.sw.id, ds = S.sw.ds, mins = Math.round(swSecs()/60);
+  S.sw = null;
+  if (mins > 0) setMins(ds, id, minsFor(ds, id) + mins);
+  save();
+  if (!quiet){
+    swAsk = (mins > 0 && !doneOn(ds, id)) ? {id:id, ds:ds, mins:mins} : null;
+    render();
+    toast(mins > 0 ? hm(mins) + " 붙였어" : "1분이 안 돼서 기록은 안 했어");
+  }
+  return mins;
+}
+function swChip(t, ds){
+  if (!IS_PC) return "";
+  return swRunning(t.id)
+    ? '<button class="tchip sw run" data-act="swstop" data-id="'+ t.id +'" title="멈추기">'
+      + '<span id="swlabel">'+ swText(swSecs()) +'</span></button>'
+    : '<button class="tchip sw" data-act="swstart" data-id="'+ t.id +'" data-d="'+ ds +'" '
+      + 'title="시작" aria-label="스톱워치 시작">▶</button>';
+}
+/* one second, DOM only — rendering would shut whatever is open */
+function tickSW(){
+  var box = el("swlabel");
+  if (box && S.sw) box.textContent = swText(swSecs());
+}
+setInterval(tickSW, 1000);
+
 function nowLine(m){
   return '<div class="nowline"><span id="nowclock">지금 '+ clock(m) +'</span></div>';
 }
@@ -2674,8 +2758,14 @@ function taskRow(t, ds){
      + chk() + '<div class="ttl">'+ esc(t.title) +'</div>'
      + (t.repeat==="weekly" ? '<div class="dayspec">'+ t.days.map(function(x){return DOW[x];}).join("") +'</div>' : '')
      + (on ? '<button class="tchip'+(mins?' set':'')+'" data-act="timeopen" data-id="'+t.id+'" data-d="'+ds+'">'
-       + (mins ? hm(mins) : '+시간') +'</button>' : '')
+       + (mins ? hm(mins) : '+시간') +'</button>' : swChip(t, ds))
      + editBtn(t.id) +'</div>';
+
+  if (swAsk && swAsk.id === t.id && !on){
+    h += '<div class="swask">'+ hm(swAsk.mins) +' 붙였어 · 이 할 일 끝났어?'
+       + '<button data-act="swcheck" data-id="'+t.id+'" data-d="'+ds+'">완료로 표시</button>'
+       + '<button class="ghost" data-act="swdismiss">아니</button></div>';
+  }
 
   if (timingId === t.id){
     h += '<div class="tpick"><div class="tpl">얼마나 걸렸어?</div><div class="tprow">'
@@ -4554,6 +4644,15 @@ function wire(){
 }
 
 function doAct(act, n){
+  /* the post-stop prompt is transient: it survives only until the next thing
+     the user does, which is what makes it a nudge instead of a chore */
+  if (act === "swdismiss"){ swAsk = null; render(); return; }
+  if (act === "swcheck"){ swAsk = null; act = "toggle"; }
+  else if (swAsk && act !== "swstart" && act !== "swstop") swAsk = null;
+
+  if (act === "swstart"){ swStart(n.dataset.id, n.dataset.d); return; }
+  if (act === "swstop"){ swStop(false); return; }
+
   if (act === "pull"){
     var r=doPull();
     if (!r){
