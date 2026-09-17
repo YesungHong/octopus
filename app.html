@@ -332,6 +332,7 @@ button,.row,.chip,.tabs button,.condpick button,.seg button,.dowpick button{
 .timegrid.one{grid-template-columns:1fr}
 .natbox label{flex-direction:row;align-items:center;gap:10px}
 .natbox label em{font-style:normal;flex:1;font-size:11px;opacity:.75}
+.hint24{font-style:normal;font-size:10.5px;opacity:.7;letter-spacing:0}
 .natbox input{width:auto;flex:none;min-width:112px;font-size:15px;padding:9px 11px}
 .tpick .submitrow{margin-top:11px}
 .tpick .submitrow button{font-size:13px;padding:10px;border-radius:8px}
@@ -753,6 +754,17 @@ img.pix{image-rendering:pixelated}
   padding:2px 7px;border-radius:6px;border:1px solid var(--accent);
   background:var(--accent-soft);color:var(--accent-ink);
   font-size:10.5px;font-weight:700;letter-spacing:.09em}
+
+/* ── PC 보드: 폭이 창을 따라간다 ────────────────────────────────
+   중단점(breakpoint)을 일부러 안 뒀다. max-width 는 그 자체로 "여기까지
+   채운다"는 뜻이라, 반칸으로 스냅한 창이든 전체화면이든 그 사이 아무
+   크기든 창이 주는 만큼 쓰고 1100px 에서 멈춘다. 창을 자주 옮겨 붙이는
+   화면에 필요한 건 몇 단계의 층이 아니라 이 연속성이다.
+
+   두 열은 만들어 봤다가 접었다 — 유저 판정으로 한 줄이 훨씬 낫다. */
+html.pcw .wrap{ max-width:1100px; padding:26px 24px 0 }
+/* 8/29 의 제목 쥐어짜기는 360px 짜리 문제였다. 여기선 자리가 넉넉하다 */
+html.pcw .row .ttl{ font-size:14.5px }
 </style>
 
 <div class="wrap">
@@ -821,6 +833,8 @@ if (CHAN){
   var _bb = document.getElementById("betabadge");
   if (_bb){ _bb.textContent = CHAN; _bb.classList.remove("hide"); }
 }
+/* the wide layout is opt-in by path, same as everything else that differs */
+if (IS_PC) document.documentElement.classList.add("pcw");
 
 /* ───────── 뽑기 · 포켓몬 도감 (1·2세대) ─────────
    Tickets come from measured study minutes, but never from sitting still:
@@ -1813,8 +1827,10 @@ function viewCond(d){
   if (open){
     h += '<h2>잠</h2>';
     h += '<div class="timegrid">'
-       + '<label>잠든 시각<input type="time" id="cSleep" value="'+ (cdraft.sleep||"") +'"></label>'
-       + '<label>일어난 시각<input type="time" id="cWake" value="'+ (cdraft.wake||"") +'"></label>'
+       + '<label>잠든 시각'+ atInput("cSleep", cdraft.sleep) +'</label>'
+       + '<label>일어난 시각'+ atInput("cWake", cdraft.wake) +'</label>'
+       + (IS_PC ? '<div class="hint24" style="grid-column:1/-1;margin-top:-2px">'
+                + '오전·오후 없이 24시간으로 — <b>13</b> 이나 <b>1330</b> 이라고만 써도 돼</div>' : '')
        + '</div>';
     h += '<div class="sleepbig">'+ sleepBigText(hrs) +'</div>';
 
@@ -2418,8 +2434,9 @@ function viewDay(d){
      +   '<button data-t="1" aria-pressed="false">Easy 1</button>'
      +   '<button data-t="2" aria-pressed="true">Med 2</button>'
      +   '<button data-t="3" aria-pressed="false">Hard 3</button></div>'
-     + '<div class="timegrid one natbox"><label>끝낼 시각 <em>안 정해도 돼</em>'
-     +   '<input type="time" id="nat" value=""></label></div>'
+     + '<div class="timegrid one natbox"><label>끝낼 시각 '
+     +   '<em>'+ (IS_PC ? '13 이라고만 써도 돼' : '안 정해도 돼') +'</em>'
+     +   atInput("nat", "") + '</label></div>'
      + '<button class="addbtn" data-act="add">추가</button>'
      + '</div>';
 
@@ -2555,10 +2572,55 @@ function atChip(t){
        + ' aria-label="'+ (t.at ? t.at+'까지, 끝낼 시각 고치기' : '끝낼 시각 정하기') +'">'
        + (t.at ? t.at : '＋시각') +'</button>';
 }
+/* The clock alone was enough on a phone, where the wheel always hands back a
+   whole time. On a desktop the same input is two typed segments, and a half
+   filled one reads back as "" — the time silently never lands. So the chips
+   are back: one click, no 확인, nothing to leave half done. */
+var ATPRESET = ["09:00","12:00","14:00","18:00","21:00"];
+
+/* A desktop time input is drawn by the OS locale, which here means an 오전/오후
+   segment nobody asked for and no attribute that turns it off — the format is
+   simply not ours to choose. So the PC board takes plain text and reads it
+   itself, and 13 · 1300 · 13:00 · 13시 all mean the same thing. The phone keeps
+   the wheel, where none of this is a problem. */
+function atOk(h, m){
+  if (!isFinite(h) || !isFinite(m) || h < 0 || h > 23 || m < 0 || m > 59) return null;
+  return String(h).padStart(2,"0") + ":" + String(m).padStart(2,"0");
+}
+function parseAt(raw){
+  var v = String(raw == null ? "" : raw).trim();
+  if (!v) return "";                                  /* 비움 = 시간 미정, 정상 상태 */
+  if (/^\d{1,2}:\d{2}$/.test(v)){                     /* type=time 이 돌려주는 모양 */
+    var a = v.split(":"); return atOk(+a[0], +a[1]);
+  }
+  v = v.replace(/시/g, ":").replace(/분/g, "").replace(/[.\s]/g, "");
+  if (v.indexOf(":") >= 0){
+    var c = v.split(":");
+    if (c.length !== 2 || !/^\d{1,2}$/.test(c[0]) || !/^\d{0,2}$/.test(c[1])) return null;
+    return atOk(+c[0], c[1] === "" ? 0 : +c[1]);
+  }
+  if (!/^\d+$/.test(v)) return null;
+  if (v.length <= 2) return atOk(+v, 0);                        /* 13   → 13:00 */
+  if (v.length === 3) return atOk(+v.slice(0,1), +v.slice(1));   /* 930  → 09:30 */
+  if (v.length === 4) return atOk(+v.slice(0,2), +v.slice(2));   /* 1300 → 13:00 */
+  return null;
+}
+function atInput(id, val){
+  return IS_PC
+    ? '<input type="text" inputmode="numeric" autocomplete="off" maxlength="5" '
+      + 'id="'+ id +'" value="'+ (val || "") +'" placeholder="13:00">'
+    : '<input type="time" id="'+ id +'" value="'+ (val || "") +'">';
+}
 function atPicker(t){
   return '<div class="tpick">'
        + '<div class="timegrid one"><label>끝낼 시각'
-       +   '<input type="time" id="atFrom" value="'+ (t.at || "") +'"></label></div>'
+       +   (IS_PC ? ' <em class="hint24">13 이라고만 써도 돼</em>' : '')
+       +   atInput("atFrom", t.at) + '</label></div>'
+       + '<div class="tprow custom">'
+       +   ATPRESET.map(function(v){
+             return '<button data-act="atset" data-v="'+ v +'"'
+                  + (t.at===v ? ' aria-pressed="true"' : '') +'>'+ v +'</button>'; }).join("")
+       + '</div>'
        + '<div class="submitrow">'
        +   (t.at ? '<button class="ghost" data-act="atclear">지우기</button>' : '')
        +   '<button class="submit" data-act="atsave">확인</button>'
@@ -3784,8 +3846,9 @@ function viewAll(){
      + '<div class="dowpick hide" id="ndays">'
      +   DOW.map(function(n,i){ return '<button data-d="'+i+'" aria-pressed="false">'+n+'</button>'; }).join("")
      + '</div>'
-     + '<div class="timegrid one natbox"><label>끝낼 시각 <em>안 정해도 돼</em>'
-     +   '<input type="time" id="nat" value=""></label></div>'
+     + '<div class="timegrid one natbox"><label>끝낼 시각 '
+     +   '<em>'+ (IS_PC ? '13 이라고만 써도 돼' : '안 정해도 돼') +'</em>'
+     +   atInput("nat", "") + '</label></div>'
      + '<button class="addbtn" id="addbtn" data-act="add">추가</button>'
      + '</div></div>';
 
@@ -4296,9 +4359,21 @@ function wire(){
     var box = el(id);
     if (!box) return;
     var key = (id === "cSleep") ? "sleep" : "wake";
-    function commit(){ cdraft[key] = box.value; patchSleep(); }
+    /* the PC box is free text, so what it holds mid-typing is not yet a time.
+       Keep only what reads as one; 930 passes through 9 and 93 on the way,
+       and a moment of blank while that happens is harmless. */
+    function commit(){
+      var v = parseAt(box.value);
+      cdraft[key] = (v === null) ? "" : v;
+      patchSleep();
+    }
     box.addEventListener("input",  commit);
-    box.addEventListener("change", commit);
+    /* on leaving the box, show it back the way it was stored — 930 becomes
+       09:30 in front of the user, which is the receipt that it landed */
+    box.addEventListener("change", function(){
+      commit();
+      if (IS_PC && cdraft[key]) box.value = cdraft[key];
+    });
   });
 
   var csts = document.querySelectorAll("input.cst");
@@ -4567,9 +4642,19 @@ function doAct(act, n){
     render(); return;
   }
   if (act === "atclear"){ applyAt(atId, ""); return; }
+  if (act === "atset"){ applyAt(atId, n.dataset.v); return; }
   if (act === "atsave"){
-    var sf = el("atFrom");
-    applyAt(atId, sf ? sf.value : ""); return;
+    var sf = el("atFrom"), raw = sf ? sf.value : "", sv = parseAt(raw);
+    /* "" means 시간 미정 and is a real answer; null means it could not be read.
+       Neither may quietly become "clear the time" — that looks exactly like
+       the time refusing to save. */
+    if (sv === null){ toast("13 이나 13:00 처럼 써줘"); return; }
+    if (!sv){
+      toast(sf && sf.validity && sf.validity.badInput
+            ? "시·분을 다 채워야 저장돼" : "시각을 고르고 확인을 눌러줘 · 아래 칩을 눌러도 돼");
+      return;
+    }
+    applyAt(atId, sv); return;
   }
   if (act === "tset"){
     if (timingId){ setMins(n.dataset.d, timingId, +n.dataset.v); save(); }
@@ -4602,7 +4687,8 @@ function doAct(act, n){
     /* added from 일간 → belongs to that date only; from 전체 → ledger item */
     var rep = (view === "day") ? "day" : draft.repeat;
     if (rep === "weekly" && !draft.days.length){ toast("요일을 하나는 골라줘"); return; }
-    var natEl = el("nat"), atv = natEl ? natEl.value : "";
+    var natEl = el("nat"), natRaw = natEl ? natEl.value : "", atv = parseAt(natRaw);
+    if (atv === null){ toast("시각은 13 이나 13:00 처럼 써줘"); natEl.focus(); return; }
     var fresh = {
       id: mintId("t", S.tasks),
       title: title, tier: draft.tier,
@@ -4611,10 +4697,15 @@ function doAct(act, n){
       days: rep === "weekly" ? draft.days.slice().sort() : []
     };
     if (atv) fresh.at = atv;          /* left blank = 시간 미정, which is a normal state */
+    /* half-typed on a desktop reads back as "", so the quest would land with
+       no time and no explanation. Add it either way — losing the title over a
+       time typo is worse — but do not let it pass in silence. */
+    var halfAt = !atv && natRaw && natEl.validity && natEl.validity.badInput;
     S.tasks.push(fresh);
     nt.value = ""; draft.days = [];
     if (natEl) natEl.value = "";
     save(); render();
+    if (halfAt) toast("할 일은 넣었어 · 시각은 시·분을 다 채워야 들어가");
     el("nt") && el("nt").focus();
     return;
   }
