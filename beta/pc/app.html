@@ -332,6 +332,7 @@ button,.row,.chip,.tabs button,.condpick button,.seg button,.dowpick button{
 .timegrid.one{grid-template-columns:1fr}
 .natbox label{flex-direction:row;align-items:center;gap:10px}
 .natbox label em{font-style:normal;flex:1;font-size:11px;opacity:.75}
+.hint24{font-style:normal;font-size:10.5px;opacity:.7;letter-spacing:0}
 .natbox input{width:auto;flex:none;min-width:112px;font-size:15px;padding:9px 11px}
 .tpick .submitrow{margin-top:11px}
 .tpick .submitrow button{font-size:13px;padding:10px;border-radius:8px}
@@ -2431,8 +2432,9 @@ function viewDay(d){
      +   '<button data-t="1" aria-pressed="false">Easy 1</button>'
      +   '<button data-t="2" aria-pressed="true">Med 2</button>'
      +   '<button data-t="3" aria-pressed="false">Hard 3</button></div>'
-     + '<div class="timegrid one natbox"><label>끝낼 시각 <em>안 정해도 돼</em>'
-     +   '<input type="time" id="nat" value=""></label></div>'
+     + '<div class="timegrid one natbox"><label>끝낼 시각 '
+     +   '<em>'+ (IS_PC ? '13 이라고만 써도 돼' : '안 정해도 돼') +'</em>'
+     +   atInput("nat", "") + '</label></div>'
      + '<button class="addbtn" data-act="add">추가</button>'
      + '</div>';
 
@@ -2573,10 +2575,45 @@ function atChip(t){
    filled one reads back as "" — the time silently never lands. So the chips
    are back: one click, no 확인, nothing to leave half done. */
 var ATPRESET = ["09:00","12:00","14:00","18:00","21:00"];
+
+/* A desktop time input is drawn by the OS locale, which here means an 오전/오후
+   segment nobody asked for and no attribute that turns it off — the format is
+   simply not ours to choose. So the PC board takes plain text and reads it
+   itself, and 13 · 1300 · 13:00 · 13시 all mean the same thing. The phone keeps
+   the wheel, where none of this is a problem. */
+function atOk(h, m){
+  if (!isFinite(h) || !isFinite(m) || h < 0 || h > 23 || m < 0 || m > 59) return null;
+  return String(h).padStart(2,"0") + ":" + String(m).padStart(2,"0");
+}
+function parseAt(raw){
+  var v = String(raw == null ? "" : raw).trim();
+  if (!v) return "";                                  /* 비움 = 시간 미정, 정상 상태 */
+  if (/^\d{1,2}:\d{2}$/.test(v)){                     /* type=time 이 돌려주는 모양 */
+    var a = v.split(":"); return atOk(+a[0], +a[1]);
+  }
+  v = v.replace(/시/g, ":").replace(/분/g, "").replace(/[.\s]/g, "");
+  if (v.indexOf(":") >= 0){
+    var c = v.split(":");
+    if (c.length !== 2 || !/^\d{1,2}$/.test(c[0]) || !/^\d{0,2}$/.test(c[1])) return null;
+    return atOk(+c[0], c[1] === "" ? 0 : +c[1]);
+  }
+  if (!/^\d+$/.test(v)) return null;
+  if (v.length <= 2) return atOk(+v, 0);                        /* 13   → 13:00 */
+  if (v.length === 3) return atOk(+v.slice(0,1), +v.slice(1));   /* 930  → 09:30 */
+  if (v.length === 4) return atOk(+v.slice(0,2), +v.slice(2));   /* 1300 → 13:00 */
+  return null;
+}
+function atInput(id, val){
+  return IS_PC
+    ? '<input type="text" inputmode="numeric" autocomplete="off" maxlength="5" '
+      + 'id="'+ id +'" value="'+ (val || "") +'" placeholder="13:00">'
+    : '<input type="time" id="'+ id +'" value="'+ (val || "") +'">';
+}
 function atPicker(t){
   return '<div class="tpick">'
        + '<div class="timegrid one"><label>끝낼 시각'
-       +   '<input type="time" id="atFrom" value="'+ (t.at || "") +'"></label></div>'
+       +   (IS_PC ? ' <em class="hint24">13 이라고만 써도 돼</em>' : '')
+       +   atInput("atFrom", t.at) + '</label></div>'
        + '<div class="tprow custom">'
        +   ATPRESET.map(function(v){
              return '<button data-act="atset" data-v="'+ v +'"'
@@ -3807,8 +3844,9 @@ function viewAll(){
      + '<div class="dowpick hide" id="ndays">'
      +   DOW.map(function(n,i){ return '<button data-d="'+i+'" aria-pressed="false">'+n+'</button>'; }).join("")
      + '</div>'
-     + '<div class="timegrid one natbox"><label>끝낼 시각 <em>안 정해도 돼</em>'
-     +   '<input type="time" id="nat" value=""></label></div>'
+     + '<div class="timegrid one natbox"><label>끝낼 시각 '
+     +   '<em>'+ (IS_PC ? '13 이라고만 써도 돼' : '안 정해도 돼') +'</em>'
+     +   atInput("nat", "") + '</label></div>'
      + '<button class="addbtn" id="addbtn" data-act="add">추가</button>'
      + '</div></div>';
 
@@ -4592,9 +4630,11 @@ function doAct(act, n){
   if (act === "atclear"){ applyAt(atId, ""); return; }
   if (act === "atset"){ applyAt(atId, n.dataset.v); return; }
   if (act === "atsave"){
-    var sf = el("atFrom"), sv = sf ? sf.value : "";
-    /* an incomplete time input reads back as "" — treating that as "clear it"
-       looks exactly like the time refusing to save. Say so instead. */
+    var sf = el("atFrom"), raw = sf ? sf.value : "", sv = parseAt(raw);
+    /* "" means 시간 미정 and is a real answer; null means it could not be read.
+       Neither may quietly become "clear the time" — that looks exactly like
+       the time refusing to save. */
+    if (sv === null){ toast("13 이나 13:00 처럼 써줘"); return; }
     if (!sv){
       toast(sf && sf.validity && sf.validity.badInput
             ? "시·분을 다 채워야 저장돼" : "시각을 고르고 확인을 눌러줘 · 아래 칩을 눌러도 돼");
@@ -4633,7 +4673,8 @@ function doAct(act, n){
     /* added from 일간 → belongs to that date only; from 전체 → ledger item */
     var rep = (view === "day") ? "day" : draft.repeat;
     if (rep === "weekly" && !draft.days.length){ toast("요일을 하나는 골라줘"); return; }
-    var natEl = el("nat"), atv = natEl ? natEl.value : "";
+    var natEl = el("nat"), natRaw = natEl ? natEl.value : "", atv = parseAt(natRaw);
+    if (atv === null){ toast("시각은 13 이나 13:00 처럼 써줘"); natEl.focus(); return; }
     var fresh = {
       id: mintId("t", S.tasks),
       title: title, tier: draft.tier,
@@ -4645,7 +4686,7 @@ function doAct(act, n){
     /* half-typed on a desktop reads back as "", so the quest would land with
        no time and no explanation. Add it either way — losing the title over a
        time typo is worse — but do not let it pass in silence. */
-    var halfAt = !atv && natEl && natEl.validity && natEl.validity.badInput;
+    var halfAt = !atv && natRaw && natEl.validity && natEl.validity.badInput;
     S.tasks.push(fresh);
     nt.value = ""; draft.days = [];
     if (natEl) natEl.value = "";
