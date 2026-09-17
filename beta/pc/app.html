@@ -753,6 +753,28 @@ img.pix{image-rendering:pixelated}
   padding:2px 7px;border-radius:6px;border:1px solid var(--accent);
   background:var(--accent-soft);color:var(--accent-ink);
   font-size:10.5px;font-weight:700;letter-spacing:.09em}
+
+/* ── PC 보드: 두 열 ───────────────────────────────────────────────
+   Two conditions, both required. The class is only on the /pc/ board, and
+   the query only fires on a genuinely wide window — the same file opens on
+   a phone, and a laptop window gets dragged narrow.
+
+   Columns rather than a grid: the cards are wildly uneven in height, and a
+   grid row is as tall as its tallest card, which would leave a hole under
+   every short one. Columns let a tall quest list sit beside three small
+   cards, which is the shape this app actually has.
+
+   :has() keeps a single-card screen — a report, 내 패턴 — in one column,
+   so nothing lands alone in an empty second column. */
+@media (min-width:1000px){
+  html.pcw .wrap{ max-width:1100px; padding:26px 24px 0 }
+  html.pcw #view:has(> :nth-child(3)){ column-count:2; column-gap:18px }
+  html.pcw #view > *{ break-inside:avoid; -webkit-column-break-inside:avoid }
+  html.pcw #view > .card{ margin-bottom:18px }
+  /* the 8/29 squeeze was a 360px problem — a column here is ~530px, so the
+     title has room again and does not need to be clipped so eagerly */
+  html.pcw .row .ttl{ font-size:14.5px }
+}
 </style>
 
 <div class="wrap">
@@ -821,6 +843,8 @@ if (CHAN){
   var _bb = document.getElementById("betabadge");
   if (_bb){ _bb.textContent = CHAN; _bb.classList.remove("hide"); }
 }
+/* the wide layout is opt-in by path, same as everything else that differs */
+if (IS_PC) document.documentElement.classList.add("pcw");
 
 /* ───────── 뽑기 · 포켓몬 도감 (1·2세대) ─────────
    Tickets come from measured study minutes, but never from sitting still:
