@@ -303,6 +303,7 @@ button,.row,.chip,.tabs button,.condpick button,.seg button,.dowpick button{
 /* the stopwatch sits in the slot a finished row uses for +시간, so an unfinished
    row gains a control without the row gaining any width */
 .tchip.sw{font-family:var(--font-num);min-width:34px}
+.tchip.sw.has{border-style:solid;color:var(--ink-2);font-variant-numeric:tabular-nums}
 .tchip.sw.run{border-style:solid;border-color:var(--accent);color:var(--accent-ink);
   background:var(--accent-soft);font-variant-numeric:tabular-nums;min-width:54px}
 .swask{display:flex;align-items:center;flex-wrap:wrap;gap:7px;margin:2px 0 9px;padding:9px 11px;
@@ -1425,6 +1426,9 @@ function blank(){
     aptexV: 2,                   /* 시험 회차 버전 — 2 = 영역별 */
     gacha: { used:0, dex:{}, hold:{}, last:null },
     sw: null,                    /* 스톱워치 {id, ds, t0} — 시작 시각만 들고 있어 새로고침을 견딘다 */
+    tsec: {},                    /* "YYYY-MM-DD": { taskId: 0..59 }
+                                    분으로 못 담은 나머지 초. S.time 을 정수 분으로 유지한 채
+                                    멈췄다 다시 재도 초가 새지 않게 하는 자리 */
     pet: true,                   /* 모은 캐릭터가 화면 아래를 돌아다닌다 */
     petPick: null                /* {k,id} — 산책할 애는 직접 고른다 */
   };
@@ -1494,7 +1498,7 @@ function load(){
      deletion path cleaned up after itself */
   var live = {};
   (S.tasks || []).forEach(function(t){ live[t.id] = 1; });
-  [S.time, S.log].forEach(function(store){
+  [S.time, S.log, S.tsec || {}].forEach(function(store){
     for (var d in store){
       for (var id in store[d]) if (!live[id]) delete store[d][id];
       if (!Object.keys(store[d]).length) delete store[d];
@@ -1593,6 +1597,19 @@ function minsOn(ds){
   return s;
 }
 function minsFor(ds, id){ return (S.time[ds] && S.time[ds][id]) || 0; }
+/* The app records minutes everywhere — graphs, 뽑기권, 주간 보고서, 하루 파일.
+   Rounding at every stop would quietly eat time: four 25-second sittings are
+   1분 40초 and would round to nothing at all. So the leftover seconds are kept
+   beside the minutes and carried into the next sitting, and every one of those
+   downstream readers still sees a plain integer. */
+function secFor(ds, id){ return (S.tsec && S.tsec[ds] && S.tsec[ds][id]) || 0; }
+function setSec(ds, id, v){
+  if (!S.tsec) S.tsec = {};
+  if (!S.tsec[ds]) S.tsec[ds] = {};
+  if (!v) delete S.tsec[ds][id]; else S.tsec[ds][id] = v;
+  if (!Object.keys(S.tsec[ds]).length) delete S.tsec[ds];
+}
+function totalSecs(ds, id){ return minsFor(ds, id) * 60 + secFor(ds, id); }
 function setMins(ds, id, v){
   if (!S.time[ds]) S.time[ds] = {};
   if (!v) delete S.time[ds][id]; else S.time[ds][id] = v;
@@ -2503,6 +2520,7 @@ function dayPack(ds){
     type: "octopus-day", v: 1, date: ds,
     from: IS_PC ? "pc" : "phone", made: Date.now(),
     log: log, time: time,
+    tsec: (S.tsec && S.tsec[ds]) || {},
     cond: S.cond[ds] || null,
     tasks: S.tasks.filter(function(t){ return need[t.id]; }),
     aptit: (S.aptit || []).filter(function(r){ return r.ds === ds; }),
@@ -2529,6 +2547,8 @@ function absorbDay(p){
 
   if (p.log  && Object.keys(p.log).length)  S.log[ds]  = p.log;  else delete S.log[ds];
   if (p.time && Object.keys(p.time).length) S.time[ds] = p.time; else delete S.time[ds];
+  if (!S.tsec) S.tsec = {};
+  if (p.tsec && Object.keys(p.tsec).length) S.tsec[ds] = p.tsec; else delete S.tsec[ds];
   if (p.cond) S.cond[ds] = p.cond; else delete S.cond[ds];
 
   /* 회차 is a per-type running count owned by this board, and the app has its
@@ -2620,26 +2640,36 @@ function swStart(id, ds){
 /* Rounds to the nearest minute because that is the unit the whole app records
    in. Under 30 seconds rounds to 0 and nothing is written — a stopwatch that
    was started by mistake should not leave a mark. */
+/* Adds the whole sitting, seconds and all. Nothing is rounded away and nothing
+   is dropped for being short — stopping and starting again is normal, and the
+   record has to survive it. */
 function swStop(quiet){
   if (!S.sw) return 0;
-  var id = S.sw.id, ds = S.sw.ds, mins = Math.round(swSecs()/60);
+  var id = S.sw.id, ds = S.sw.ds, add = swSecs();
   S.sw = null;
-  if (mins > 0) setMins(ds, id, minsFor(ds, id) + mins);
+  var total = totalSecs(ds, id) + add;
+  setMins(ds, id, Math.floor(total/60));
+  setSec(ds, id, total % 60);
   save();
   if (!quiet){
-    swAsk = (mins > 0 && !doneOn(ds, id)) ? {id:id, ds:ds, mins:mins} : null;
+    swAsk = (add > 0 && !doneOn(ds, id)) ? {id:id, ds:ds, add:add, total:total} : null;
     render();
-    toast(mins > 0 ? hm(mins) + " 붙였어" : "1분이 안 돼서 기록은 안 했어");
+    toast(swText(add) + " 붙였어 · 모두 " + swText(total));
   }
-  return mins;
+  return add;
 }
 function swChip(t, ds){
   if (!IS_PC) return "";
-  return swRunning(t.id)
-    ? '<button class="tchip sw run" data-act="swstop" data-id="'+ t.id +'" title="멈추기">'
-      + '<span id="swlabel">'+ swText(swSecs()) +'</span></button>'
-    : '<button class="tchip sw" data-act="swstart" data-id="'+ t.id +'" data-d="'+ ds +'" '
-      + 'title="시작" aria-label="스톱워치 시작">▶</button>';
+  if (swRunning(t.id)){
+    return '<button class="tchip sw run" data-act="swstop" data-id="'+ t.id +'" title="멈추기">'
+         + '<span id="swlabel">'+ swText(swSecs()) +'</span></button>';
+  }
+  /* an unchecked row has no +시간 chip, so without this the time just measured
+     would go invisible the moment the prompt goes away */
+  var acc = totalSecs(ds, t.id);
+  return '<button class="tchip sw'+ (acc ? ' has' : '') +'" data-act="swstart" data-id="'+ t.id +'" '
+       + 'data-d="'+ ds +'" title="시작" aria-label="스톱워치 시작">'
+       + (acc ? '▶ ' + swText(acc) : '▶') + '</button>';
 }
 /* one second, DOM only — rendering would shut whatever is open */
 function tickSW(){
@@ -2762,7 +2792,9 @@ function taskRow(t, ds){
      + editBtn(t.id) +'</div>';
 
   if (swAsk && swAsk.id === t.id && !on){
-    h += '<div class="swask">'+ hm(swAsk.mins) +' 붙였어 · 이 할 일 끝났어?'
+    h += '<div class="swask">'+ swText(swAsk.add) +' 붙였어'
+       + (swAsk.total !== swAsk.add ? ' · 모두 ' + swText(swAsk.total) : '')
+       + ' · 이 할 일 끝났어?'
        + '<button data-act="swcheck" data-id="'+t.id+'" data-d="'+ds+'">완료로 표시</button>'
        + '<button class="ghost" data-act="swdismiss">아니</button></div>';
   }
@@ -4725,7 +4757,7 @@ function doAct(act, n){
     var before = Math.round(weekPts(ws)/S.weeklyTarget*100);
     var wasOn = doneOn(ds, id);
     toggle(ds, id);
-    if (wasOn) setMins(ds, id, 0);   /* unchecking drops its time too */
+    if (wasOn){ setMins(ds, id, 0); setSec(ds, id, 0); }   /* unchecking drops its time too */
     timingId = null; save();
     var after = Math.round(weekPts(ws)/S.weeklyTarget*100);
     var dayNow = ptsOn(iso(today()));
@@ -4789,13 +4821,15 @@ function doAct(act, n){
     applyAt(atId, sv); return;
   }
   if (act === "tset"){
-    if (timingId){ setMins(n.dataset.d, timingId, +n.dataset.v); save(); }
+    /* a hand-set value is the truth; a leftover from the stopwatch would make
+       "30분" quietly mean 30분 40초 */
+    if (timingId){ setMins(n.dataset.d, timingId, +n.dataset.v); setSec(n.dataset.d, timingId, 0); save(); }
     timingId = null; render(); return;
   }
   if (act === "tsetc"){
     var box = el("tcustom"), v = Math.max(0, Math.min(1440, parseInt(box.value,10) || 0));
     if (!v){ box.focus(); return; }
-    if (timingId){ setMins(n.dataset.d, timingId, v); save(); }
+    if (timingId){ setMins(n.dataset.d, timingId, v); setSec(n.dataset.d, timingId, 0); save(); }
     timingId = null; render(); return;
   }
   if (act === "del"){
@@ -4808,6 +4842,8 @@ function doAct(act, n){
     for (var d in S.log){ delete S.log[d][tid]; if (!Object.keys(S.log[d]).length) delete S.log[d]; }
     /* its minutes go with it, or they keep counting toward daily totals */
     for (var d2 in S.time){ delete S.time[d2][tid]; if (!Object.keys(S.time[d2]).length) delete S.time[d2]; }
+    for (var d3 in (S.tsec||{})){ delete S.tsec[d3][tid]; if (!Object.keys(S.tsec[d3]).length) delete S.tsec[d3]; }
+    if (S.sw && S.sw.id === tid) S.sw = null;      /* 지워진 할 일의 시계는 남겨두지 않는다 */
     timingId = atId = null;
     if (editingId === tid) editingId = null;     /* 삭제 can now be pressed from inside the editor */
     save(); render(); return;
