@@ -2551,6 +2551,10 @@ function timeline(list, ds, isToday){
   var loose = list.filter(function(t){ return !t.at; });
 
   var h = "", now = (isToday && timed.length) ? nowMin() : null, drawn = false;
+  /* remember where the line landed, so the ticker can tell "the clock moved"
+     from "the line has to move past a quest" — only the latter needs a render */
+  nowMarks = (now === null) ? [] : timed.map(atMin);
+  nowSlot  = (now === null) ? -1 : nowMarks.filter(function(v){ return v <= now; }).length;
   timed.forEach(function(t){
     if (now !== null && !drawn && atMin(t) > now){ h += nowLine(now); drawn = true; }
     h += taskRow(t, ds);
@@ -2561,8 +2565,37 @@ function timeline(list, ds, isToday){
   return h;
 }
 function nowLine(m){
-  return '<div class="nowline"><span>지금 '+ clock(m) +'</span></div>';
+  return '<div class="nowline"><span id="nowclock">지금 '+ clock(m) +'</span></div>';
 }
+
+/* ───────── 지금 선을 살아 있게 ─────────
+   nowMin() is read while drawing, so the line freezes at whatever time the
+   page was opened. On a phone that never shows — the app is opened fresh each
+   time. A PC tab stays open all day, and the line quietly lies.
+
+   Re-rendering every minute is not an option: it would shut an open picker and
+   throw away what is being typed (the same trap as 8/29's time wheel). So the
+   text is patched in place, and a full render happens only when the line truly
+   has to move past a quest — and even then, never while something is open.
+   A skipped minute is not lost; the next tick finds the same condition. */
+var nowMarks = [], nowSlot = -1, tickAt = null;
+function tickBusy(){
+  if (atId || timingId || editingId || editingCond) return true;
+  var a = document.activeElement;
+  return !!(a && (a.tagName === "INPUT" || a.tagName === "TEXTAREA"));
+}
+function tickNow(){
+  var box = el("nowclock");
+  if (!box) return;                              /* 지금 선이 지금 화면에 없다 */
+  var m = nowMin();
+  if (m === tickAt) return;
+  tickAt = m;
+  var slot = nowMarks.filter(function(v){ return v <= m; }).length;
+  if (slot === nowSlot){ box.textContent = "지금 " + clock(m); return; }
+  if (tickBusy()) return;                        /* 열어둔 게 있으면 다음 번에 */
+  render();
+}
+setInterval(tickNow, 15000);
 function clock(m){
   var hh = Math.floor(m/60), mm = m % 60;
   return (hh<10?"0":"") + hh + ":" + (mm<10?"0":"") + mm;
