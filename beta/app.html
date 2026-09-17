@@ -2568,10 +2568,20 @@ function atChip(t){
        + ' aria-label="'+ (t.at ? t.at+'까지, 끝낼 시각 고치기' : '끝낼 시각 정하기') +'">'
        + (t.at ? t.at : '＋시각') +'</button>';
 }
+/* The clock alone was enough on a phone, where the wheel always hands back a
+   whole time. On a desktop the same input is two typed segments, and a half
+   filled one reads back as "" — the time silently never lands. So the chips
+   are back: one click, no 확인, nothing to leave half done. */
+var ATPRESET = ["09:00","12:00","14:00","18:00","21:00"];
 function atPicker(t){
   return '<div class="tpick">'
        + '<div class="timegrid one"><label>끝낼 시각'
        +   '<input type="time" id="atFrom" value="'+ (t.at || "") +'"></label></div>'
+       + '<div class="tprow custom">'
+       +   ATPRESET.map(function(v){
+             return '<button data-act="atset" data-v="'+ v +'"'
+                  + (t.at===v ? ' aria-pressed="true"' : '') +'>'+ v +'</button>'; }).join("")
+       + '</div>'
        + '<div class="submitrow">'
        +   (t.at ? '<button class="ghost" data-act="atclear">지우기</button>' : '')
        +   '<button class="submit" data-act="atsave">확인</button>'
@@ -4580,9 +4590,17 @@ function doAct(act, n){
     render(); return;
   }
   if (act === "atclear"){ applyAt(atId, ""); return; }
+  if (act === "atset"){ applyAt(atId, n.dataset.v); return; }
   if (act === "atsave"){
-    var sf = el("atFrom");
-    applyAt(atId, sf ? sf.value : ""); return;
+    var sf = el("atFrom"), sv = sf ? sf.value : "";
+    /* an incomplete time input reads back as "" — treating that as "clear it"
+       looks exactly like the time refusing to save. Say so instead. */
+    if (!sv){
+      toast(sf && sf.validity && sf.validity.badInput
+            ? "시·분을 다 채워야 저장돼" : "시각을 고르고 확인을 눌러줘 · 아래 칩을 눌러도 돼");
+      return;
+    }
+    applyAt(atId, sv); return;
   }
   if (act === "tset"){
     if (timingId){ setMins(n.dataset.d, timingId, +n.dataset.v); save(); }
@@ -4624,10 +4642,15 @@ function doAct(act, n){
       days: rep === "weekly" ? draft.days.slice().sort() : []
     };
     if (atv) fresh.at = atv;          /* left blank = 시간 미정, which is a normal state */
+    /* half-typed on a desktop reads back as "", so the quest would land with
+       no time and no explanation. Add it either way — losing the title over a
+       time typo is worse — but do not let it pass in silence. */
+    var halfAt = !atv && natEl && natEl.validity && natEl.validity.badInput;
     S.tasks.push(fresh);
     nt.value = ""; draft.days = [];
     if (natEl) natEl.value = "";
     save(); render();
+    if (halfAt) toast("할 일은 넣었어 · 시각은 시·분을 다 채워야 들어가");
     el("nt") && el("nt").focus();
     return;
   }
