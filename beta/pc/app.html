@@ -1827,8 +1827,10 @@ function viewCond(d){
   if (open){
     h += '<h2>잠</h2>';
     h += '<div class="timegrid">'
-       + '<label>잠든 시각<input type="time" id="cSleep" value="'+ (cdraft.sleep||"") +'"></label>'
-       + '<label>일어난 시각<input type="time" id="cWake" value="'+ (cdraft.wake||"") +'"></label>'
+       + '<label>잠든 시각'+ atInput("cSleep", cdraft.sleep) +'</label>'
+       + '<label>일어난 시각'+ atInput("cWake", cdraft.wake) +'</label>'
+       + (IS_PC ? '<div class="hint24" style="grid-column:1/-1;margin-top:-2px">'
+                + '오전·오후 없이 24시간으로 — <b>13</b> 이나 <b>1330</b> 이라고만 써도 돼</div>' : '')
        + '</div>';
     h += '<div class="sleepbig">'+ sleepBigText(hrs) +'</div>';
 
@@ -4357,9 +4359,21 @@ function wire(){
     var box = el(id);
     if (!box) return;
     var key = (id === "cSleep") ? "sleep" : "wake";
-    function commit(){ cdraft[key] = box.value; patchSleep(); }
+    /* the PC box is free text, so what it holds mid-typing is not yet a time.
+       Keep only what reads as one; 930 passes through 9 and 93 on the way,
+       and a moment of blank while that happens is harmless. */
+    function commit(){
+      var v = parseAt(box.value);
+      cdraft[key] = (v === null) ? "" : v;
+      patchSleep();
+    }
     box.addEventListener("input",  commit);
-    box.addEventListener("change", commit);
+    /* on leaving the box, show it back the way it was stored — 930 becomes
+       09:30 in front of the user, which is the receipt that it landed */
+    box.addEventListener("change", function(){
+      commit();
+      if (IS_PC && cdraft[key]) box.value = cdraft[key];
+    });
   });
 
   var csts = document.querySelectorAll("input.cst");
