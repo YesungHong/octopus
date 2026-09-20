@@ -39,19 +39,48 @@ html,body{margin:0;background:var(--bg);color:var(--ink);
 .mast h1 span{font-size:17px}
 
 /* the clock: the one thing that never stops moving */
-.now{background:var(--surface);border:1px solid var(--line-soft);border-radius:12px;
-  padding:14px 16px;margin:12px 0 16px;box-shadow:var(--shadow)}
-.now .d{font-size:12.5px;color:var(--ink-3);letter-spacing:.04em}
-.now .big{font-family:var(--font-num);font-size:34px;font-weight:600;letter-spacing:-.02em;
-  font-variant-numeric:tabular-nums;line-height:1.1;margin-top:2px}
-.now .sub{font-size:13px;color:var(--ink-2);margin-top:3px}
-.daybar{height:5px;border-radius:3px;background:var(--sunk);overflow:hidden;margin-top:10px}
+/* the day is the page; the totals are a footnote to it */
+.now{background:var(--surface);border:1px solid var(--line);border-radius:14px;
+  padding:16px 17px 18px;margin:12px 0 14px;box-shadow:var(--shadow)}
+.now .d{font-size:12.5px;color:var(--ink-3);letter-spacing:.04em;font-variant-numeric:tabular-nums}
+.now .big{font-family:var(--font-num);font-size:38px;font-weight:600;letter-spacing:-.025em;
+  font-variant-numeric:tabular-nums;line-height:1.05;margin-top:1px}
+.now .big em{font-style:normal;font-size:17px;color:var(--ink-3);margin-left:5px;letter-spacing:0}
+.daybar{height:5px;border-radius:3px;background:var(--sunk);overflow:hidden;margin-top:11px}
 .daybar i{display:block;height:100%;background:var(--ink-3)}
+
+.q{display:flex;align-items:center;gap:11px;padding:12px 0;border-top:1px solid var(--line-soft)}
+.q:first-of-type{border-top:0}
+.q .nm{flex:1;min-width:0;font-size:14.5px;font-weight:600;overflow:hidden;
+  text-overflow:ellipsis;white-space:nowrap}
+.q .nm s{display:block;text-decoration:none;font-size:11.5px;font-weight:400;color:var(--ink-3);
+  font-variant-numeric:tabular-nums}
+.q .ct{font-family:var(--font-num);font-size:20px;font-weight:600;font-variant-numeric:tabular-nums;
+  flex:none;min-width:62px;text-align:right}
+.q .ct s{text-decoration:none;color:var(--ink-3);font-size:13px}
+.q.done .ct{color:var(--accent)}
+.q .qb{display:flex;gap:5px;flex:none}
+.q .qb button{appearance:none;border:1px solid var(--line);background:var(--bg);color:var(--ink-2);
+  font:inherit;font-size:13px;font-weight:650;width:34px;height:34px;border-radius:8px;cursor:pointer;
+  font-variant-numeric:tabular-nums;padding:0}
+.q .qb button.add{border-color:var(--accent);background:var(--accent);color:#fff}
+.q .qb button:active{transform:translateY(1px)}
+.q .rare{font-size:12.5px;color:var(--ink-3);flex:none;font-variant-numeric:tabular-nums}
+
+.verdict{margin-top:13px;padding-top:13px;border-top:1px solid var(--line-soft);
+  font-size:13.5px;color:var(--ink-2);line-height:1.5}
+.verdict b{color:var(--ink);font-weight:650}
+.verdict b.hot{color:var(--hot)}
 
 .card{background:var(--surface);border:1px solid var(--line-soft);border-radius:12px;
   padding:15px 16px 17px;margin-bottom:14px;box-shadow:var(--shadow)}
 .card>h2{margin:0 0 3px;font-size:11px;font-weight:700;letter-spacing:.15em;
   text-transform:uppercase;color:var(--ink-3)}
+.tot{display:flex;align-items:baseline;gap:9px;margin-top:13px}
+.tot .nm{flex:1;min-width:0;font-size:13.5px;color:var(--ink-2);overflow:hidden;
+  text-overflow:ellipsis;white-space:nowrap}
+.tot .ct{font-family:var(--font-num);font-size:14px;font-variant-numeric:tabular-nums;color:var(--ink-2)}
+.tot .ct s{text-decoration:none;color:var(--ink-3);font-size:12px}
 
 .dl{display:flex;flex-wrap:wrap;gap:8px;margin:10px 0 4px}
 .dl .chip{flex:1 1 150px;background:var(--sunk);border-radius:9px;padding:9px 11px}
@@ -61,13 +90,7 @@ html,body{margin:0;background:var(--bg);color:var(--ink);
 .dl .chip .n em{font-style:normal;font-size:12px;color:var(--ink-3);margin-left:3px}
 .dl .chip .s{font-size:11px;color:var(--ink-3);font-variant-numeric:tabular-nums}
 
-.item{margin-top:16px;padding-top:15px;border-top:1px solid var(--line-soft)}
-.item:first-of-type{border-top:0;padding-top:4px}
-.ihead{display:flex;align-items:baseline;gap:9px}
-.ihead .nm{font-size:15px;font-weight:650;flex:1;min-width:0}
-.ihead .ct{font-family:var(--font-num);font-size:17px;font-weight:600;font-variant-numeric:tabular-nums}
-.ihead .ct s{text-decoration:none;color:var(--ink-3);font-size:13px}
-.rail{position:relative;height:9px;border-radius:5px;background:var(--sunk);margin:9px 0 0;overflow:hidden}
+.rail{position:relative;height:7px;border-radius:5px;background:var(--sunk);margin:9px 0 0;overflow:hidden}
 .rail i{display:block;height:100%;background:var(--accent);transition:width .25s}
 .rail u{position:absolute;top:-3px;bottom:-3px;width:2px;background:var(--ink);opacity:.55}
 .rail.over i{background:var(--accent-ink)}
@@ -76,7 +99,7 @@ html,body{margin:0;background:var(--bg);color:var(--ink);
 .verdict{margin-top:9px;font-size:13.5px;color:var(--ink-2);line-height:1.45}
 .verdict b{color:var(--ink);font-weight:650}
 .verdict b.hot{color:var(--hot)}
-.btns{display:flex;gap:7px;margin-top:11px;flex-wrap:wrap}
+.btns{display:flex;gap:7px;margin-top:13px;flex-wrap:wrap}
 .btns button{appearance:none;border:1px solid var(--line);background:var(--bg);color:var(--ink-2);
   font:inherit;font-size:13px;font-weight:650;padding:8px 13px;border-radius:8px;cursor:pointer;
   font-variant-numeric:tabular-nums}
@@ -121,17 +144,22 @@ var S, storageOK = true;
 function blank(){
   var today = iso(new Date());
   return {
-    start: today,                       /* the period runs from the day you began */
-    marks: [                            /* deadlines, in date order */
+    v: 2,
+    start: today,
+    marks: [
       { id:"skct",  name:"SKCT",   date:"2026-10-10" },
       { id:"gsat",  name:"GSAT",   date:"2026-10-24" },
       { id:"final", name:"최종면접", date:"2026-11-30" }
     ],
     items: [
-      { id:"mock",  track:"인적성", name:"모의고사",        unit:"세트", n:0, goal:60,  due:"gsat"  },
-      { id:"acad",  track:"면접",   name:"사관학교 5회독",  unit:"편",   n:0, goal:740, due:"final" },
-      { id:"books", track:"면접",   name:"책 읽기",          unit:"권",   n:0, goal:5,   due:"final" }
-    ]
+      { id:"mock",  track:"인적성", name:"모의고사",       unit:"세트", goal:60,  due:"gsat"  },
+      { id:"acad",  track:"면접",   name:"사관학교 5회독", unit:"편",   goal:740, due:"final" },
+      { id:"books", track:"면접",   name:"책 읽기",         unit:"권",   goal:5,   due:"final" }
+    ],
+    /* "YYYY-MM-DD": { itemId: count } — the day is the unit of record, and the
+       total is derived from it. Keeping a separate running total would let the
+       two drift, and the day is the thing being lived. */
+    log: {}
   };
 }
 
@@ -140,9 +168,10 @@ function iso(d){
        + "-" + String(d.getDate()).padStart(2,"0");
 }
 function fromIso(s){ var p = String(s).split("-"); return new Date(+p[0], +p[1]-1, +p[2]); }
-/* deadlines land at the end of their day — a paper on 10/24 is not over at 00:00 */
+/* deadlines land at the end of their day — a test on 10/24 is not over at 00:00 */
 function endOf(s){ var d = fromIso(s); d.setHours(23,59,59,999); return d; }
 function dayStart(){ var d = new Date(); d.setHours(0,0,0,0); return d; }
+function todayIso(){ return iso(new Date()); }
 
 function load(){
   var stored = null;
@@ -151,6 +180,18 @@ function load(){
   try { localStorage.setItem(KEY+".probe","1"); localStorage.removeItem(KEY+".probe"); }
   catch(e){ storageOK = false; }
   S = stored || blank();
+  /* v1 kept a running total on the item; move it into the day it was recorded
+     so there is one source of truth. Runs before the blank merge, or the new
+     `log` key would already be there and hide the evidence. */
+  if (S.v !== 2){
+    S.log = S.log || {};
+    var d = S.start || todayIso(), day = S.log[d] || (S.log[d] = {});
+    (S.items || []).forEach(function(it){
+      if (it.n) day[it.id] = (day[it.id] || 0) + it.n;
+      delete it.n;
+    });
+    S.v = 2;
+  }
   var b = blank();
   for (var k in b) if (!(k in S)) S[k] = b[k];
 }
@@ -167,13 +208,30 @@ function toast(m){
 }
 
 /* ───────── the arithmetic ─────────
-   Everything below is a ratio of elapsed to total. Nothing is rounded in the
-   flattering direction and nothing stops at 100%: going past the goal keeps
-   counting, because a target you have already cleared should not read the same
-   as one you just met. */
+   Everything is a ratio of elapsed to total, and today's quota is simply what
+   is left divided by the days left. That makes it self-correcting in both
+   directions without any bookkeeping: skip today and tomorrow's number rises,
+   do extra and it falls. No streaks, no penalties — just division. */
 function markById(id){
   for (var i=0;i<S.marks.length;i++) if (S.marks[i].id === id) return S.marks[i];
   return S.marks[S.marks.length-1];
+}
+function itemById(id){
+  for (var i=0;i<S.items.length;i++) if (S.items[i].id === id) return S.items[i];
+  return null;
+}
+function total(id){
+  var t = 0;
+  for (var d in S.log) t += (S.log[d][id] || 0);
+  return t;
+}
+function todayN(id){ var d = S.log[todayIso()]; return (d && d[id]) || 0; }
+function addN(id, v){
+  var d = todayIso();
+  if (!S.log[d]) S.log[d] = {};
+  S.log[d][id] = Math.max(0, (S.log[d][id] || 0) + v);
+  if (!S.log[d][id]) delete S.log[d][id];
+  if (!Object.keys(S.log[d]).length) delete S.log[d];
 }
 function daysLeft(dateStr){
   return Math.max(0, Math.ceil((endOf(dateStr) - new Date()) / 86400000));
@@ -183,107 +241,105 @@ function periodPct(dateStr){
   if (b <= a) return 100;
   return Math.max(0, Math.min(100, (now - a) / (b - a) * 100));
 }
-function dayPct(){
-  var d = dayStart();
-  return (new Date() - d) / 86400000 * 100;
-}
+function dayPct(){ return (new Date() - dayStart()) / 86400000 * 100; }
 function pad2(n){ return String(n).padStart(2,"0"); }
 
-function need(it){
-  /* how many per day from right now, counting today as still available */
-  var m = markById(it.due), left = it.goal - it.n;
+/* what today owes, counting what is already done today so the number a person
+   reads in the morning does not shrink under them as they work */
+function quota(it){
+  var m = markById(it.due);
+  var left = it.goal - total(it.id) + todayN(it.id);
   if (left <= 0) return 0;
   var d = daysLeft(m.date);
   return d <= 0 ? left : left / d;
 }
 
 /* ───────── render ───────── */
+var DOW = ["일","월","화","수","목","금","토"];
+
 function render(){
-  var h = "";
-  var now = new Date();
-  var DOW = ["일","월","화","수","목","금","토"];
-  var dp = dayPct();
+  var now = new Date(), dp = dayPct();
+  var h = '<div class="now">'
+    + '<div class="d">' + (now.getMonth()+1) + '월 ' + now.getDate() + '일 ('
+    +   DOW[now.getDay()] + ')   ' + pad2(now.getHours()) + ':' + pad2(now.getMinutes())
+    +   ':' + pad2(now.getSeconds()) + '</div>'
+    + '<div class="big">오늘 ' + dp.toFixed(1) + '%<em>지났다 · ' + fmtLeft(86400000 - (now - dayStart())) + ' 남음</em></div>'
+    + '<div class="daybar"><i style="width:' + dp.toFixed(2) + '%"></i></div>';
 
-  h += '<div class="now">'
-     + '<div class="d">' + (now.getMonth()+1) + '월 ' + now.getDate() + '일 ('
-     +   DOW[now.getDay()] + ')  ' + pad2(now.getHours()) + ':' + pad2(now.getMinutes())
-     +   ':' + pad2(now.getSeconds()) + '</div>'
-     + '<div class="big">오늘 ' + dp.toFixed(1) + '%</div>'
-     + '<div class="sub">하루 중 ' + fmtLeft(86400000 - (now - dayStart())) + ' 남음</div>'
-     + '<div class="daybar"><i style="width:' + dp.toFixed(2) + '%"></i></div>'
-     + '</div>';
-
-  var tracks = [["인적성", ["skct","gsat"]], ["면접", ["final"]]];
-  tracks.forEach(function(t){
-    var name = t[0], markIds = t[1];
-    h += '<div class="card"><h2>' + name + '</h2><div class="dl">';
-    markIds.forEach(function(mid){
-      var m = markById(mid), dl = daysLeft(m.date), pp = periodPct(m.date);
-      h += '<div class="chip"><b>' + esc(m.name) + ' · ' + m.date.slice(5).replace("-","/") + '</b>'
-         + '<div class="n">' + dl + '<em>일 남음</em></div>'
-         + '<div class="s">기간 ' + pp.toFixed(1) + '% 지남</div></div>';
-    });
-    h += '</div>';
-    S.items.filter(function(x){ return x.track === name; }).forEach(function(it){
-      h += itemRow(it);
-    });
-    h += '</div>';
+  var owed = 0, got = 0;
+  S.items.forEach(function(it){
+    var q = quota(it), n = todayN(it.id);
+    if (q >= 0.5){ owed += Math.ceil(q); got += Math.min(n, Math.ceil(q)); }
+    h += quotaRow(it, q, n);
   });
+  h += '<div class="verdict">' + dayVerdict(owed, got, dp) + '</div></div>';
+
+  h += '<div class="card"><h2>전체</h2>';
+  [["인적성", ["skct","gsat"]], ["면접", ["final"]]].forEach(function(t){
+    h += '<div class="dl">';
+    t[1].forEach(function(mid){
+      var m = markById(mid);
+      h += '<div class="chip"><b>' + esc(m.name) + ' · ' + m.date.slice(5).replace("-","/") + '</b>'
+         + '<div class="n">' + daysLeft(m.date) + '<em>일 남음</em></div>'
+         + '<div class="s">기간 ' + periodPct(m.date).toFixed(1) + '% 지남</div></div>';
+    });
+    h += '</div>';
+    S.items.filter(function(x){ return x.track === t[0]; }).forEach(function(it){
+      var tn = total(it.id), pct = it.goal > 0 ? tn / it.goal * 100 : 0;
+      var pp = periodPct(markById(it.due).date);
+      h += '<div class="tot"><div class="nm">' + esc(it.name) + '</div>'
+         + '<div class="ct">' + tn + '<s> / ' + it.goal + ' ' + esc(it.unit) + '</s></div></div>'
+         + '<div class="rail' + (pct >= 100 ? ' over' : '') + '">'
+         +   '<i style="width:' + Math.min(100, pct).toFixed(2) + '%"></i>'
+         +   '<u style="left:calc(' + Math.min(100, pp).toFixed(2) + '% - 1px)"></u></div>'
+         + '<div class="legend"><span>' + pct.toFixed(1) + '%</span>'
+         +   '<span>│ 시간 ' + pp.toFixed(1) + '%</span></div>';
+    });
+  });
+  h += '</div>';
 
   el("view").innerHTML = h;
   wire();
 }
 
-function fmtLeft(ms){
-  var s = Math.max(0, Math.floor(ms/1000));
-  var hh = Math.floor(s/3600), mm = Math.floor(s%3600/60);
-  return hh + '시간 ' + mm + '분';
-}
-function esc(s){ return String(s).replace(/[&<>"]/g, function(c){
-  return {"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[c]; }); }
-
-function itemRow(it){
-  var m = markById(it.due);
-  var done = it.goal > 0 ? it.n / it.goal * 100 : 0;
-  var pp = periodPct(m.date);
-  var per = need(it);
-  var over = it.n >= it.goal && it.goal > 0;
-
-  var h = '<div class="item">'
-    + '<div class="ihead"><div class="nm">' + esc(it.name) + '</div>'
-    + '<div class="ct">' + it.n + '<s> / ' + it.goal + ' ' + esc(it.unit) + '</s></div></div>'
-    + '<div class="rail' + (over ? ' over' : '') + '">'
-    +   '<i style="width:' + Math.min(100, done).toFixed(2) + '%"></i>'
-    +   '<u style="left:calc(' + Math.min(100, pp).toFixed(2) + '% - 1px)"></u>'
-    + '</div>'
-    + '<div class="legend"><span>내 진행 ' + done.toFixed(1) + '%</span>'
-    +   '<span>│ 는 시간 ' + pp.toFixed(1) + '%</span></div>';
-
-  h += '<div class="verdict">' + verdict(it, done, pp, per, m) + '</div>';
-  h += '<div class="btns">'
-    + '<button data-act="inc" data-id="' + it.id + '" data-v="1" class="add">+1</button>'
-    + '<button data-act="inc" data-id="' + it.id + '" data-v="5">+5</button>'
-    + '<button data-act="inc" data-id="' + it.id + '" data-v="-1">−1</button>'
-    + '<span class="gap"></span>'
+function quotaRow(it, q, n){
+  var rare = q > 0 && q < 0.5;
+  var goal = Math.ceil(q);
+  var done = !rare && q > 0 && n >= goal;
+  var cleared = q <= 0;
+  var h = '<div class="q' + (done || cleared ? ' done' : '') + '">'
+    + '<div class="nm">' + esc(it.name);
+  if (rare) h += '<s>' + Math.round(1/q) + '일에 ' + esc(it.unit) + ' 하나</s>';
+  else if (cleared) h += '<s>목표를 넘겼다</s>';
+  h += '</div>';
+  if (rare) h += '<div class="rare">오늘 ' + n + '</div>';
+  else h += '<div class="ct">' + n + '<s> / ' + goal + '</s></div>';
+  h += '<div class="qb">'
+    + '<button data-act="inc" data-id="' + it.id + '" data-v="-1">−</button>'
+    + '<button data-act="inc" data-id="' + it.id + '" data-v="1" class="add">+</button>'
     + '</div></div>';
   return h;
 }
 
-/* One sentence, and it always ends in a number you can act on. No consolation:
-   the gap is stated, then converted into today's quota. */
-function verdict(it, done, pp, per, m){
-  var left = it.goal - it.n, d = daysLeft(m.date);
-  if (it.goal <= 0) return '목표를 정하면 속도를 계산해줄게.';
-  if (left <= 0)
-    return '<b>' + it.n + it.unit + ' — 목표 ' + it.goal + ' 를 넘겼다.</b> 여기서 더 쌓이는 건 전부 여유분이다.';
-  var q = per <= 0 ? 0 : per;
-  var s = '남은 <b>' + left + it.unit + '</b> ÷ <b>' + d + '일</b> = '
-        + '하루 <b class="hot">' + (q < 1 ? q.toFixed(2) : q.toFixed(1)) + it.unit + '</b>';
-  var gap = pp - done;
-  if (gap > 0) s += ' · 시간이 <b>' + gap.toFixed(1) + '%p</b> 앞서 있다.';
-  else s += ' · 진행이 시간보다 <b>' + (-gap).toFixed(1) + '%p</b> 앞서 있다.';
-  return s;
+/* One line, and it ends in something to do. "12%p 뒤처짐" has no next move;
+   "오늘 3개 남았다" does. */
+function dayVerdict(owed, got, dp){
+  if (!owed) return '오늘 몫은 없다. 남은 건 전부 여유분이다.';
+  if (got >= owed)
+    return '<b>오늘 몫 ' + owed + '개 다 했다.</b> 여기서 더 하는 만큼 내일이 줄어든다.';
+  var left = owed - got;
+  var mine = got / owed * 100;
+  return '오늘 몫 <b>' + owed + '</b> 중 <b>' + got + '</b>. 남은 <b class="hot">'
+       + left + '개</b>를 남은 <b>' + fmtLeft(86400000 - (new Date() - dayStart()))
+       + '</b> 안에. <br>진행 ' + mine.toFixed(0) + '% · 하루는 ' + dp.toFixed(0) + '% 지났다.';
 }
+
+function fmtLeft(ms){
+  var s = Math.max(0, Math.floor(ms/1000));
+  return Math.floor(s/3600) + '시간 ' + Math.floor(s%3600/60) + '분';
+}
+function esc(s){ return String(s).replace(/[&<>"]/g, function(c){
+  return {"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[c]; }); }
 
 /* ───────── settings ───────── */
 var showSet = false;
@@ -326,12 +382,9 @@ function wire(){
 
 function act(a, n){
   if (a === "inc"){
-    var v = +n.dataset.v;
-    S.items.forEach(function(it){
-      if (it.id !== n.dataset.id) return;
-      it.n = Math.max(0, it.n + v);
-      if (v > 0) toast(it.name + ' ' + it.n + esc(it.unit));
-    });
+    var id = n.dataset.id, it = itemById(id);
+    addN(id, +n.dataset.v);
+    if (+n.dataset.v > 0 && it) toast(it.name + ' 오늘 ' + todayN(id) + it.unit);
     save(); draw(); return;
   }
   if (a === "setdone"){ showSet = false; draw(); return; }
