@@ -59,6 +59,8 @@ html,body{margin:0;background:var(--bg);color:var(--ink);
   font:inherit;font-size:17px;line-height:1;width:38px;height:38px;border-radius:9px;cursor:pointer;flex:none}
 .datenav button:disabled{opacity:.3;cursor:default}
 .datenav .dt{flex:1;text-align:center;font-size:15px;font-weight:650}
+.datenav .dt i{font-style:normal;font-size:11px;font-weight:700;color:var(--accent-ink);
+  background:var(--accent-soft);border-radius:5px;padding:1px 6px;vertical-align:2px}
 .datenav .dt s{display:block;text-decoration:none;font-size:11.5px;font-weight:400;
   color:var(--ink-3);font-variant-numeric:tabular-nums;letter-spacing:.03em}
 
@@ -86,16 +88,22 @@ html,body{margin:0;background:var(--bg);color:var(--ink);
 
 /* four circles, two by two — small enough that a phone shows all of them
    without scrolling, which is the point of putting them together */
-.grid{display:grid;grid-template-columns:1fr 1fr;gap:6px 4px;margin:2px 0 4px}
-.cell{text-align:center}
+/* one row, swiped sideways — the circles get to be big enough to read at a
+   glance, which is the whole job of this page */
+.grid{display:flex;gap:6px;overflow-x:auto;scroll-snap-type:x mandatory;
+  margin:0 -16px;padding:2px 16px 10px;scrollbar-width:none}
+.grid::-webkit-scrollbar{display:none}
+.cell{flex:0 0 auto;scroll-snap-align:center;text-align:center;width:250px}
 .cell .lb{font-size:11px;font-weight:700;letter-spacing:.09em;color:var(--ink-3);
   text-transform:uppercase;margin-bottom:1px}
 
-.clockwrap.sm{width:136px;height:136px;margin:0 auto}
-.clockwrap.sm .clk{width:136px;height:136px}
-.clockwrap.sm .clockmid .pc{font-size:21px}
-.clockwrap.sm .clockmid .pc em{font-size:11px;margin-left:1px}
-.clockwrap.sm .clockmid .sb{font-size:10px;margin-top:2px}
+.cell .clockwrap{width:236px;height:236px;margin:0 auto}
+.cell .clk{width:236px;height:236px}
+.cell .clockmid .pc{font-size:38px}
+.cell .clockmid .pc em{font-size:17px;margin-left:2px}
+.cell .clockmid .sb{font-size:12px;margin-top:4px}
+.dots{display:flex;justify-content:center;gap:6px;margin:-4px 0 8px}
+.dots i{width:6px;height:6px;border-radius:50%;background:var(--line);display:block}
 
 /* circle 1 has no second hand, so the colour carries the hour */
 .clk .sweep{fill:none;stroke-width:9;stroke-linecap:butt;stroke:var(--ink-3);opacity:.30}
@@ -130,6 +138,10 @@ html,body{margin:0;background:var(--bg);color:var(--ink);
   text-overflow:ellipsis;white-space:nowrap}
 .q .nm s{display:block;text-decoration:none;font-size:11.5px;font-weight:400;color:var(--ink-3);
   font-variant-numeric:tabular-nums}
+.q .dir{width:86px;flex:none;background:var(--bg);border:1px solid var(--line);border-radius:8px;
+  padding:7px 9px;color:var(--ink);font:inherit;font-family:var(--font-num);font-size:17px;
+  font-weight:600;font-variant-numeric:tabular-nums;text-align:right}
+.q .dir:focus{outline:0;border-color:var(--accent)}
 .q .ct{font-family:var(--font-num);font-size:20px;font-weight:600;font-variant-numeric:tabular-nums;
   flex:none;min-width:62px;text-align:right}
 .q .ct s{text-decoration:none;color:var(--ink-3);font-size:13px}
@@ -227,11 +239,14 @@ function blank(){
       { id:"final", name:"최종면접", date:"2026-11-30" }
     ],
     items: [
-      { id:"mock", track:"인적성", name:"모의고사",   unit:"세트", goal:60,  step:1,   due:"gsat"  },
+      /* 주말 가중 4 — 25 평일 × 1 + 10 주말 × 4 = 65 세트, 목표 60 을 5 넘긴다.
+         평일에 2세트를 얹으면 반도체 2시간과 합쳐 하루 4시간이 되고, 그건
+         번아웃 중에 지켜지지 않는 숫자다. */
+      { id:"mock", track:"인적성", name:"모의고사",   unit:"세트", goal:60,  step:1,   wknd:4, due:"gsat"  },
       /* 사관학교 편수와 책 쪽수는 길이가 제각각이라 서로 더할 수 없다. 시간은
          더해진다 — 두 가지 공부를 하나의 원으로 묶을 수 있는 유일한 단위다.
          하루 2시간 × 11/30 까지 = 144. */
-      { id:"semi", track:"면접",   name:"반도체 공부", unit:"시간", goal:144, step:0.5, due:"final" }
+      { id:"semi", track:"면접",   name:"반도체 공부", unit:"시간", goal:144, step:0.5, wknd:1, due:"final" }
     ],
     /* "YYYY-MM-DD": { itemId: count } — the day is the unit of record, and the
        total is derived from it. Keeping a separate running total would let the
@@ -316,6 +331,12 @@ function addN(id, v, ds){
   if (!S.log[d][id]) delete S.log[d][id];
   if (!Object.keys(S.log[d]).length) delete S.log[d];
 }
+function setN(id, v, ds){
+  var d = ds || todayIso();
+  if (!S.log[d]) S.log[d] = {};
+  if (v > 0) S.log[d][id] = v; else delete S.log[d][id];
+  if (!Object.keys(S.log[d]).length) delete S.log[d];
+}
 function daysLeft(dateStr){
   return Math.max(0, Math.ceil((endOf(dateStr) - new Date()) / 86400000));
 }
@@ -356,11 +377,21 @@ function daysFrom(dateStr, fromIsoStr){
   var from = fromIso(fromIsoStr);
   return Math.max(0, Math.round((endOf(dateStr) - from) / 86400000));
 }
+/* A weekday and a Saturday are not the same amount of room, so the remaining
+   work is split by weight rather than evenly. Dividing by the weighted sum of
+   the days that are left keeps the self-correction — miss a day and every
+   later day's share rises — while letting the weekend carry more. The result
+   is rounded so the number on the face is one you can actually finish. */
+function isWknd(dateStr){ var w = fromIso(dateStr).getDay(); return w === 0 || w === 6; }
+function wOf(it, dateStr){ return isWknd(dateStr) ? (it.wknd || 1) : 1; }
 function quotaOn(it, dateStr){
   var left = it.goal - totalBefore(it.id, dateStr);
   if (left <= 0) return 0;
-  var d = daysFrom(markById(it.due).date, dateStr);
-  return d <= 0 ? left : left / d;
+  var end = fromIso(markById(it.due).date), d = fromIso(dateStr), sum = 0;
+  while (d <= end){ sum += wOf(it, iso(d)); d.setDate(d.getDate() + 1); }
+  if (sum <= 0) return left;
+  var q = left * wOf(it, dateStr) / sum;
+  return it.unit === "시간" ? Math.round(q * 2) / 2 : Math.max(0, Math.round(q));
 }
 function nOn(id, dateStr){ var d = S.log[dateStr]; return (d && d[id]) || 0; }
 
@@ -462,41 +493,39 @@ function viewDay(){
   var h = '<div class="datenav">'
     + '<button data-act="day" data-v="-1">‹</button>'
     + '<div class="dt">' + (d.getMonth()+1) + '월 ' + d.getDate() + '일 (' + DOW[d.getDay()] + ')'
+    +   (isWknd(ds) ? ' <i>주말</i>' : '')
     +   (isToday ? '<s>' + pad2(now.getHours()) + ':' + pad2(now.getMinutes()) + ':' + pad2(now.getSeconds()) + '</s>'
                  : '<s>' + (cur < 0 ? -cur + '일 전' : '') + '</s>') + '</div>'
     + '<button data-act="day" data-v="1"' + (cur >= 0 ? ' disabled' : '') + '>›</button></div>';
 
-  /* ① 시간 — 한 바늘, 색이 시간을 말한다 */
   var g = '<div class="grid">';
   g += ring('시간', clock(tp, 0, tp.toFixed(1) + '<em>%</em>',
         isToday ? fmtLeft(leftMs) + ' 남음' : (tp ? '끝난 날' : '아직'),
-        {solo:true, small:true}));
+        {solo:true}));
 
-  /* ②③ 항목마다 — 오늘 몫 대비 진행, 시간과 나란히 */
-  var owed = 0, got = 0;
+  var parts = [];
   S.items.forEach(function(it){
     var q = quotaOn(it, ds), n = nOn(it.id, ds);
-    var goal = q > 0 ? q : 0;
-    var wp = goal > 0 ? Math.min(200, n / goal * 100) : (n > 0 ? 100 : 0);
-    if (goal > 0){ owed += goal; got += Math.min(n, goal); }
+    var wp = q > 0 ? Math.min(150, n / q * 100) : (n > 0 ? 100 : 0);
+    parts.push(wp);
     g += ring(it.name, clock(tp, wp,
-          fmtQ(n, it.unit) + '<em>/' + (goal > 0 ? fmtQ(goal, it.unit) : '—') + '</em>',
-          it.unit, {small:true}));
+          fmtQ(n, it.unit) + '<em>/' + (q > 0 ? fmtQ(q, it.unit) : '—') + '</em>',
+          esc(it.unit), {}));
   });
 
-  /* ④ 전체 */
-  var op = overallPct(), pp = periodPct(markById("final").date);
-  g += ring('전체', clock(pp, op, op.toFixed(0) + '<em>%</em>',
-        daysLeft(markById("final").date) + '일 남음', {small:true}));
+  /* ④ 오늘 전체 — 두 항목을 1:1 로. 세트와 시간은 더할 수 없지만 "제 몫의
+     몇 %" 는 같은 자로 잴 수 있고, 유저가 원한 가중도 동률이다. */
+  var all = parts.length ? parts.reduce(function(a,b){ return a+b; }, 0) / parts.length : 0;
+  g += ring('오늘 전체', clock(tp, all, all.toFixed(0) + '<em>%</em>',
+        '모의고사 · 반도체 1:1', {}));
   g += '</div>';
-  h += '<div class="now">' + g;
 
-  h += '<div class="items">';
+  h += '<div class="now">' + g + '<div class="items">';
   S.items.forEach(function(it){
     h += quotaRow(it, quotaOn(it, ds), nOn(it.id, ds), ds);
   });
   h += '</div><div class="verdict">'
-     + dayVerdict(owed, got, tp, isToday) + '</div></div>';
+     + dayVerdict(100, all, tp, isToday) + '</div></div>';
   return h;
 }
 
@@ -560,7 +589,7 @@ function quotaRow(it, q, n, ds){
 
 function dayVerdict(owed, got, tp, isToday){
   if (owed <= 0) return '이 날 몫은 없다. 쌓이는 건 전부 여유분이다.';
-  var wp = got / owed * 100;
+  var wp = got;
   if (wp >= 99.5)
     return '<b>이 날 몫 다 했다.</b> 여기서 더 하는 만큼 내일이 줄어든다.';
   if (!isToday)
@@ -600,6 +629,13 @@ function wire(){
   document.querySelectorAll("[data-act]").forEach(function(n){
     n.addEventListener("click", function(){ act(n.dataset.act, n); });
   });
+  document.querySelectorAll("[data-set]").forEach(function(n){
+    n.addEventListener("change", function(){
+      var v = Math.max(0, Math.round((parseFloat(n.value) || 0) * 2) / 2);
+      setN(n.dataset.set, v, n.dataset.d);
+      save(); n.blur(); draw();
+    });
+  });
   var st = el("st");
   if (st) st.addEventListener("change", function(){ S.start = st.value; save(); });
   document.querySelectorAll("[data-mk]").forEach(function(n){
@@ -629,7 +665,14 @@ function act(a, n){
   if (a === "setdone"){ showSet = false; draw(); return; }
 }
 
+/* the page redraws every second; redrawing under a caret would eat what is
+   being typed, so the tick stands down while an input has focus */
+function busy(){
+  var a = document.activeElement;
+  return !!(a && (a.tagName === "INPUT" || a.tagName === "TEXTAREA"));
+}
 function draw(){
+  if (busy()) return;
   render();
   if (showSet){ el("view").insertAdjacentHTML("beforeend", settings()); wire(); }
 }
