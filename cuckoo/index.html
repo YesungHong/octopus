@@ -84,7 +84,30 @@ html,body{margin:0;background:var(--bg);color:var(--ink);
 .clockmid .pc em{font-style:normal;font-size:14px;margin-left:1px}
 .clockmid .sb{font-size:11.5px;color:var(--ink-3);margin-top:3px;font-variant-numeric:tabular-nums}
 
-.items{margin-top:6px}
+/* four circles, two by two — small enough that a phone shows all of them
+   without scrolling, which is the point of putting them together */
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:6px 4px;margin:2px 0 4px}
+.cell{text-align:center}
+.cell .lb{font-size:11px;font-weight:700;letter-spacing:.09em;color:var(--ink-3);
+  text-transform:uppercase;margin-bottom:1px}
+
+.clockwrap.sm{width:136px;height:136px;margin:0 auto}
+.clockwrap.sm .clk{width:136px;height:136px}
+.clockwrap.sm .clockmid .pc{font-size:21px}
+.clockwrap.sm .clockmid .pc em{font-size:11px;margin-left:1px}
+.clockwrap.sm .clockmid .sb{font-size:10px;margin-top:2px}
+
+/* circle 1 has no second hand, so the colour carries the hour */
+.clk .sweep{fill:none;stroke-width:9;stroke-linecap:butt;stroke:var(--ink-3);opacity:.30}
+.clk.tone1 .sweep{opacity:.14}
+.clk.tone2 .sweep{opacity:.26}
+.clk.tone3 .sweep{opacity:.42}
+.clk.tone4 .sweep{opacity:.62}
+.clk.tone5 .sweep{opacity:.9;stroke:var(--hot)}
+.clk.tone5 .hand.t{stroke:var(--hot)}
+.clockmid .pc.neutral{color:var(--ink)}
+
+.items{margin-top:10px;border-top:1px solid var(--line-soft);padding-top:2px}
 
 /* ── 전체 탭 ── */
 .allrow{display:flex;align-items:center;gap:14px;margin-top:14px;padding-top:14px;
@@ -196,7 +219,7 @@ var S, storageOK = true;
 function blank(){
   var today = iso(new Date());
   return {
-    v: 2,
+    v: 3,
     start: today,
     marks: [
       { id:"skct",  name:"SKCT",   date:"2026-10-10" },
@@ -204,9 +227,11 @@ function blank(){
       { id:"final", name:"최종면접", date:"2026-11-30" }
     ],
     items: [
-      { id:"mock",  track:"인적성", name:"모의고사",       unit:"세트", goal:60,  due:"gsat"  },
-      { id:"acad",  track:"면접",   name:"사관학교 5회독", unit:"편",   goal:740, due:"final" },
-      { id:"books", track:"면접",   name:"책 읽기",         unit:"권",   goal:5,   due:"final" }
+      { id:"mock", track:"인적성", name:"모의고사",   unit:"세트", goal:60,  step:1,   due:"gsat"  },
+      /* 사관학교 편수와 책 쪽수는 길이가 제각각이라 서로 더할 수 없다. 시간은
+         더해진다 — 두 가지 공부를 하나의 원으로 묶을 수 있는 유일한 단위다.
+         하루 2시간 × 11/30 까지 = 144. */
+      { id:"semi", track:"면접",   name:"반도체 공부", unit:"시간", goal:144, step:0.5, due:"final" }
     ],
     /* "YYYY-MM-DD": { itemId: count } — the day is the unit of record, and the
        total is derived from it. Keeping a separate running total would let the
@@ -235,14 +260,20 @@ function load(){
   /* v1 kept a running total on the item; move it into the day it was recorded
      so there is one source of truth. Runs before the blank merge, or the new
      `log` key would already be there and hide the evidence. */
-  if (S.v !== 2){
+  if (S.v === 2){
+    /* acad(편) + books(권) 를 semi(시간) 하나로. 서로 다른 단위를 합치지 않고
+       기록만 옮기지 않는다 — 옛 기록이 있으면 그대로 두고 항목만 교체한다. */
+    S.items = blank().items;
+    S.v = 3;
+  }
+  if (S.v !== 2 && S.v !== 3){
     S.log = S.log || {};
     var d = S.start || todayIso(), day = S.log[d] || (S.log[d] = {});
     (S.items || []).forEach(function(it){
       if (it.n) day[it.id] = (day[it.id] || 0) + it.n;
       delete it.n;
     });
-    S.v = 2;
+    S.v = 3;
   }
   var b = blank();
   for (var k in b) if (!(k in S)) S[k] = b[k];
@@ -281,7 +312,7 @@ function todayN(id){ var d = S.log[todayIso()]; return (d && d[id]) || 0; }
 function addN(id, v, ds){
   var d = ds || todayIso();
   if (!S.log[d]) S.log[d] = {};
-  S.log[d][id] = Math.max(0, (S.log[d][id] || 0) + v);
+  S.log[d][id] = Math.round(Math.max(0, (S.log[d][id] || 0) + v) * 100) / 100;
   if (!S.log[d][id]) delete S.log[d][id];
   if (!Object.keys(S.log[d]).length) delete S.log[d];
 }
@@ -345,7 +376,14 @@ function timePctOn(dateStr){
    Two hands on one face. The grey hand is time, the coloured one is what has
    been done. Whichever is further round is ahead, and the arc between them is
    the gap — so "역전" is not a number to read but a shape to see. */
-function clock(timeP, workP, mid, sub){
+/* tone rises with the hour: barely there at dawn, insistent by evening. The
+   colour is the only thing on circle 1 that says "running out", because there
+   is no second hand to compare against. */
+function toneOf(p){
+  return p < 20 ? 1 : p < 40 ? 2 : p < 60 ? 3 : p < 80 ? 4 : 5;
+}
+function clock(timeP, workP, mid, sub, opt){
+  opt = opt || {};
   var R = 74, C = 88, r2 = 60;
   function pt(pct, rad){
     var a = (pct/100) * Math.PI*2 - Math.PI/2;
@@ -357,25 +395,33 @@ function clock(timeP, workP, mid, sub){
     return 'M' + s[0].toFixed(1) + ' ' + s[1].toFixed(1)
          + ' A' + rad + ' ' + rad + ' 0 ' + big + ' 1 ' + e[0].toFixed(1) + ' ' + e[1].toFixed(1);
   }
+  var solo = !!opt.solo;
   var ahead = workP >= timeP;
-  var h = '<svg class="clk" viewBox="0 0 176 176" aria-hidden="true">';
+  var h = '<svg class="clk' + (solo ? ' tone' + toneOf(timeP) : '') + '" viewBox="0 0 176 176" aria-hidden="true">';
   h += '<circle cx="88" cy="88" r="' + R + '" class="face"/>';
   for (var i=0;i<24;i++){
     var o = pt(i/24*100, R), q = pt(i/24*100, R - (i%6 ? 5 : 9));
     h += '<line x1="'+o[0].toFixed(1)+'" y1="'+o[1].toFixed(1)+'" x2="'+q[0].toFixed(1)+'" y2="'+q[1].toFixed(1)
        + '" class="tick' + (i%6 ? '' : ' big') + '"/>';
   }
-  /* the gap, drawn from whichever hand is behind to whichever is ahead */
-  var lo = Math.min(timeP, workP), hi = Math.max(timeP, workP);
-  if (hi - lo > 0.3)
-    h += '<path d="' + arc(lo, hi, r2) + '" class="gap ' + (ahead ? 'up' : 'dn') + '"/>';
-  var ht = pt(Math.min(timeP,100), R - 16), hw = pt(Math.min(workP,100), R - 30);
+  if (solo){
+    if (timeP > 0.3) h += '<path d="' + arc(0, Math.min(timeP,99.99), r2) + '" class="sweep"/>';
+  } else {
+    var lo = Math.min(timeP, workP), hi = Math.max(timeP, workP);
+    if (hi - lo > 0.3)
+      h += '<path d="' + arc(lo, hi, r2) + '" class="gap ' + (ahead ? 'up' : 'dn') + '"/>';
+  }
+  var ht = pt(Math.min(timeP,100), R - 16);
   h += '<line x1="88" y1="88" x2="'+ht[0].toFixed(1)+'" y2="'+ht[1].toFixed(1)+'" class="hand t"/>';
-  h += '<line x1="88" y1="88" x2="'+hw[0].toFixed(1)+'" y2="'+hw[1].toFixed(1)+'" class="hand w'
-     + (ahead ? ' up' : '') + '"/>';
+  if (!solo){
+    var hw = pt(Math.min(workP,100), R - 30);
+    h += '<line x1="88" y1="88" x2="'+hw[0].toFixed(1)+'" y2="'+hw[1].toFixed(1)+'" class="hand w'
+       + (ahead ? ' up' : '') + '"/>';
+  }
   h += '<circle cx="88" cy="88" r="4.5" class="pin"/></svg>';
-  return '<div class="clockwrap">' + h
-       + '<div class="clockmid"><div class="pc' + (ahead ? ' up' : '') + '">' + mid + '</div>'
+  return '<div class="clockwrap' + (opt.small ? ' sm' : '') + '">' + h
+       + '<div class="clockmid"><div class="pc'
+       + (solo ? ' neutral' : (ahead ? ' up' : '')) + '">' + mid + '</div>'
        + '<div class="sb">' + sub + '</div></div></div>';
 }
 
@@ -389,34 +435,73 @@ function render(){
   wire();
 }
 
+function fmtQ(v, unit){
+  if (unit === "시간"){
+    var hh = Math.floor(v), mm = Math.round((v - hh) * 60);
+    if (mm === 60){ hh++; mm = 0; }
+    return mm ? hh + ':' + pad2(mm) : hh + ':00';
+  }
+  return (Math.abs(v - Math.round(v)) < 0.01) ? String(Math.round(v)) : v.toFixed(1);
+}
+
+/* 전체 진행 = 항목별 달성률의 평균. 단위가 다른 것들을 더할 수는 없지만
+   "목표의 몇 %" 는 같은 자로 잴 수 있다. */
+function overallPct(){
+  if (!S.items.length) return 0;
+  var t = 0;
+  S.items.forEach(function(it){ t += it.goal > 0 ? Math.min(100, total(it.id)/it.goal*100) : 0; });
+  return t / S.items.length;
+}
+
 function viewDay(){
   var ds = curIso(), d = curDate(), now = new Date();
   var isToday = cur === 0;
   var tp = timePctOn(ds);
-
-  var owed = 0, got = 0;
-  S.items.forEach(function(it){
-    var q = quotaOn(it, ds), n = nOn(it.id, ds);
-    if (q >= 0.5){ owed += Math.ceil(q); got += Math.min(n, Math.ceil(q)); }
-  });
-  var wp = owed ? got / owed * 100 : 0;
+  var leftMs = 86400000 - (now - dayStart());
 
   var h = '<div class="datenav">'
     + '<button data-act="day" data-v="-1">‹</button>'
     + '<div class="dt">' + (d.getMonth()+1) + '월 ' + d.getDate() + '일 (' + DOW[d.getDay()] + ')'
     +   (isToday ? '<s>' + pad2(now.getHours()) + ':' + pad2(now.getMinutes()) + ':' + pad2(now.getSeconds()) + '</s>'
-                 : '<s>' + (cur < 0 ? -cur + '일 전' : cur + '일 뒤') + '</s>') + '</div>'
+                 : '<s>' + (cur < 0 ? -cur + '일 전' : '') + '</s>') + '</div>'
     + '<button data-act="day" data-v="1"' + (cur >= 0 ? ' disabled' : '') + '>›</button></div>';
 
-  h += '<div class="now">'
-    + clock(tp, wp, owed ? Math.round(wp) + '<em>%</em>' : '—',
-            '시간 ' + tp.toFixed(0) + '%')
-    + '<div class="items">';
+  /* ① 시간 — 한 바늘, 색이 시간을 말한다 */
+  var g = '<div class="grid">';
+  g += ring('시간', clock(tp, 0, tp.toFixed(1) + '<em>%</em>',
+        isToday ? fmtLeft(leftMs) + ' 남음' : (tp ? '끝난 날' : '아직'),
+        {solo:true, small:true}));
+
+  /* ②③ 항목마다 — 오늘 몫 대비 진행, 시간과 나란히 */
+  var owed = 0, got = 0;
+  S.items.forEach(function(it){
+    var q = quotaOn(it, ds), n = nOn(it.id, ds);
+    var goal = q > 0 ? q : 0;
+    var wp = goal > 0 ? Math.min(200, n / goal * 100) : (n > 0 ? 100 : 0);
+    if (goal > 0){ owed += goal; got += Math.min(n, goal); }
+    g += ring(it.name, clock(tp, wp,
+          fmtQ(n, it.unit) + '<em>/' + (goal > 0 ? fmtQ(goal, it.unit) : '—') + '</em>',
+          it.unit, {small:true}));
+  });
+
+  /* ④ 전체 */
+  var op = overallPct(), pp = periodPct(markById("final").date);
+  g += ring('전체', clock(pp, op, op.toFixed(0) + '<em>%</em>',
+        daysLeft(markById("final").date) + '일 남음', {small:true}));
+  g += '</div>';
+  h += '<div class="now">' + g;
+
+  h += '<div class="items">';
   S.items.forEach(function(it){
     h += quotaRow(it, quotaOn(it, ds), nOn(it.id, ds), ds);
   });
-  h += '</div><div class="verdict">' + dayVerdict(owed, got, tp, isToday) + '</div></div>';
+  h += '</div><div class="verdict">'
+     + dayVerdict(owed, got, tp, isToday) + '</div></div>';
   return h;
+}
+
+function ring(label, svg){
+  return '<div class="cell"><div class="lb">' + esc(label) + '</div>' + svg + '</div>';
 }
 
 function viewAll(){
@@ -457,34 +542,33 @@ function allLine(it, tn, pct, pp){
 }
 
 function quotaRow(it, q, n, ds){
-  var rare = q > 0 && q < 0.5;
-  var goal = Math.ceil(q);
-  var done = !rare && q > 0 && n >= goal;
+  var st = it.step || 1;
+  var done = q > 0 && n >= q;
   var cleared = q <= 0;
   var h = '<div class="q' + (done || cleared ? ' done' : '') + '">'
-    + '<div class="nm">' + esc(it.name);
-  if (rare) h += '<s>' + Math.round(1/q) + '일에 ' + esc(it.unit) + ' 하나</s>';
-  else if (cleared) h += '<s>목표를 넘겼다</s>';
-  h += '</div>';
-  if (rare) h += '<div class="rare">' + n + esc(it.unit) + '</div>';
-  else h += '<div class="ct">' + n + '<s> / ' + goal + '</s></div>';
-  h += '<div class="qb">'
-    + '<button data-act="inc" data-id="' + it.id + '" data-d="' + ds + '" data-v="-1">−</button>'
-    + '<button data-act="inc" data-id="' + it.id + '" data-d="' + ds + '" data-v="1" class="add">+</button>'
+    + '<div class="nm">' + esc(it.name)
+    + '<s>' + (cleared ? '목표를 넘겼다'
+              : '오늘 ' + fmtQ(q, it.unit) + esc(it.unit)) + '</s></div>'
+    + '<div class="ct">' + fmtQ(n, it.unit)
+    + '<s> ' + esc(it.unit) + '</s></div>'
+    + '<div class="qb">'
+    + '<button data-act="inc" data-id="' + it.id + '" data-d="' + ds + '" data-v="' + (-st) + '">−</button>'
+    + '<button data-act="inc" data-id="' + it.id + '" data-d="' + ds + '" data-v="' + st + '" class="add">+</button>'
     + '</div></div>';
   return h;
 }
 
 function dayVerdict(owed, got, tp, isToday){
-  if (!owed) return '이 날 몫은 없다. 쌓이는 건 전부 여유분이다.';
-  if (got >= owed)
-    return '<b>몫 ' + owed + '개 다 했다.</b> 여기서 더 하는 만큼 내일이 줄어든다.';
-  var left = owed - got, wp = got / owed * 100;
+  if (owed <= 0) return '이 날 몫은 없다. 쌓이는 건 전부 여유분이다.';
+  var wp = got / owed * 100;
+  if (wp >= 99.5)
+    return '<b>이 날 몫 다 했다.</b> 여기서 더 하는 만큼 내일이 줄어든다.';
   if (!isToday)
-    return '몫 <b>' + owed + '</b> 중 <b>' + got + '</b>. ' + left + '개가 남은 날들로 넘어갔다.';
-  return '몫 <b>' + owed + '</b> 중 <b>' + got + '</b>. 남은 <b class="hot">' + left + '개</b>를 '
-       + '<b>' + fmtLeft(86400000 - (new Date() - dayStart())) + '</b> 안에.<br>'
-       + (wp >= tp ? '진행이 시간을 앞질렀다.' : '시간이 ' + (tp - wp).toFixed(0) + '%p 앞서 있다.');
+    return '몫의 <b>' + wp.toFixed(0) + '%</b> 했다. 나머지는 남은 날들로 넘어갔다.';
+  return '몫의 <b>' + wp.toFixed(0) + '%</b> · 하루는 <b>' + tp.toFixed(0) + '%</b> 지났다. '
+       + (wp >= tp ? '<b>진행이 시간을 앞질렀다.</b>'
+                   : '시간이 <b class="hot">' + (tp - wp).toFixed(0) + '%p</b> 앞서 있다.')
+       + '<br>남은 <b>' + fmtLeft(86400000 - (new Date() - dayStart())) + '</b>.';
 }
 
 function fmtLeft(ms){
