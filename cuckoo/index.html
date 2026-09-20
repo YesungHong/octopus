@@ -102,8 +102,36 @@ html,body{margin:0;background:var(--bg);color:var(--ink);
 .cell .clockmid .pc{font-size:38px}
 .cell .clockmid .pc em{font-size:17px;margin-left:2px}
 .cell .clockmid .sb{font-size:12px;margin-top:4px}
-.dots{display:flex;justify-content:center;gap:6px;margin:-4px 0 8px}
-.dots i{width:6px;height:6px;border-radius:50%;background:var(--line);display:block}
+.zoom{appearance:none;border:0;background:transparent;padding:0;cursor:pointer;display:block;width:100%}
+
+/* ── 확대 ── */
+.zoomlay{position:fixed;inset:0;background:var(--bg);z-index:20;
+  display:flex;align-items:center;justify-content:center;padding:18px}
+.zbox{text-align:center}
+.zbox .lb{font-size:12px;font-weight:700;letter-spacing:.1em;color:var(--ink-3);
+  text-transform:uppercase;margin-bottom:8px}
+.zbox .clockwrap{width:min(86vw,64vh);height:min(86vw,64vh);margin:0 auto}
+.zbox .clk{width:100%;height:100%}
+.zbox .clockmid .pc{font-size:min(15vw,11vh)}
+.zbox .clockmid .pc em{font-size:min(6vw,4.4vh)}
+.zbox .clockmid .sb{font-size:min(3.6vw,2.6vh);margin-top:5px}
+.zbtns{display:flex;gap:8px;justify-content:center;margin-top:20px}
+.zbtns button{appearance:none;border:1px solid var(--accent);background:var(--accent);color:#fff;
+  font:inherit;font-size:14px;font-weight:650;padding:11px 18px;border-radius:9px;cursor:pointer}
+.zbtns button.gh{background:transparent;border-color:var(--line);color:var(--ink-2)}
+
+/* ── 창 모드 (?only=) ── */
+body.onlypage .wrap{max-width:none;padding:0;height:100vh}
+body.onlypage .mast,body.onlypage .foot{display:none}
+.onlywrap{height:100vh;display:flex;flex-direction:column;align-items:center;
+  justify-content:center;gap:6px;padding:10px}
+.onlywrap .lb{font-size:11px;font-weight:700;letter-spacing:.1em;color:var(--ink-3);text-transform:uppercase}
+.onlywrap .clockwrap{width:min(88vw,74vh);height:min(88vw,74vh);margin:0}
+.onlywrap .clk{width:100%;height:100%}
+.onlywrap .clockmid .pc{font-size:min(17vw,14vh)}
+.onlywrap .clockmid .pc em{font-size:min(7vw,5.6vh)}
+.onlywrap .clockmid .sb{font-size:min(4vw,3.2vh);margin-top:4px}
+.onlyd{font-size:12px;color:var(--ink-3);font-variant-numeric:tabular-nums}
 
 /* circle 1 has no second hand, so the colour carries the hour */
 .clk .wedge{fill:var(--ink-3);opacity:.30;transition:opacity .4s}
@@ -139,10 +167,12 @@ html,body{margin:0;background:var(--bg);color:var(--ink);
   text-overflow:ellipsis;white-space:nowrap}
 .q .nm s{display:block;text-decoration:none;font-size:11.5px;font-weight:400;color:var(--ink-3);
   font-variant-numeric:tabular-nums}
-.q .dir{width:86px;flex:none;background:var(--bg);border:1px solid var(--line);border-radius:8px;
-  padding:7px 9px;color:var(--ink);font:inherit;font-family:var(--font-num);font-size:17px;
-  font-weight:600;font-variant-numeric:tabular-nums;text-align:right}
-.q .dir:focus{outline:0;border-color:var(--accent)}
+.logrow{display:flex;gap:7px;margin:-4px 0 11px}
+.logrow .dur{flex:1;min-width:0;background:var(--bg);border:1px solid var(--line);border-radius:8px;
+  padding:9px 11px;color:var(--ink);font:inherit;font-size:14px}
+.logrow .dur:focus{outline:0;border-color:var(--accent)}
+.logrow button{appearance:none;border:1px solid var(--accent);background:var(--accent);color:#fff;
+  font:inherit;font-size:13px;font-weight:650;padding:0 15px;border-radius:8px;cursor:pointer;flex:none}
 .q .ct{font-family:var(--font-num);font-size:20px;font-weight:600;font-variant-numeric:tabular-nums;
   flex:none;min-width:62px;text-align:right}
 .q .ct s{text-decoration:none;color:var(--ink-3);font-size:13px}
@@ -332,9 +362,22 @@ function todayN(id){ var d = S.log[todayIso()]; return (d && d[id]) || 0; }
 function addN(id, v, ds){
   var d = ds || todayIso();
   if (!S.log[d]) S.log[d] = {};
-  S.log[d][id] = Math.round(Math.max(0, (S.log[d][id] || 0) + v) * 100) / 100;
+  /* minute resolution: 1:20 must not drift into 1.33 hours and back out wrong */
+  S.log[d][id] = Math.round(Math.max(0, (S.log[d][id] || 0) + v) * 60) / 60;
   if (!S.log[d][id]) delete S.log[d][id];
   if (!Object.keys(S.log[d]).length) delete S.log[d];
+}
+function commitDur(id, ds, box){
+  var v = parseDur(box.value);
+  if (v === null){ toast("1:20 · 1.5 · 80분 처럼 써줘"); box.select && box.select(); return; }
+  if (v <= 0){ box.value = ""; return; }
+  addN(id, v, ds);
+  var it = itemById(id);
+  box.value = "";
+  box.blur();
+  save();
+  toast(fmtQ(v, "시간") + " 더했다 · 오늘 " + fmtQ(nOn(id, ds), "시간"));
+  draw();
 }
 function setN(id, v, ds){
   var d = ds || todayIso();
@@ -483,7 +526,18 @@ function clock(timeP, workP, mid, sub, opt){
    away with it — which is why a swipe kept snapping back to the first circle.
    The offset is carried across the rebuild, and while a finger is actually
    moving the carousel the tick stands down entirely so momentum is not fought. */
-var scrollX = 0, scrolling = 0;
+var scrollX = 0, scrolling = 0, zoomId = null;
+
+function zoomLayer(id){
+  var ds = curIso(), f = faceOf(id, ds, timePctOn(ds));
+  if (!f) return "";
+  return '<div class="zoomlay" data-act="unzoom">'
+    + '<div class="zbox"><div class="lb">' + esc(f[0]) + '</div>' + f[1]
+    + '<div class="zbtns">'
+    +   '<button data-act="popout">창으로 열기</button>'
+    +   '<button data-act="unzoom" class="gh">닫기</button>'
+    + '</div></div></div>';
+}
 function keepScroll(){
   var g = document.querySelector(".grid");
   if (g) scrollX = g.scrollLeft;
@@ -495,12 +549,19 @@ function restoreScroll(){
 }
 
 function render(){
+  var only = onlyId();
+  if (only){
+    document.body.classList.add("onlypage");
+    el("view").innerHTML = viewOnly(only);
+    return;
+  }
   keepScroll();
   var h = '<div class="tabs">'
     + '<button data-act="tab" data-v="day"' + (tab==="day" ? ' aria-selected="true"' : '') + '>오늘</button>'
     + '<button data-act="tab" data-v="all"' + (tab==="all" ? ' aria-selected="true"' : '') + '>전체</button>'
     + '</div>';
   h += (tab === "day") ? viewDay() : viewAll();
+  if (zoomId) h += zoomLayer(zoomId);
   el("view").innerHTML = h;
   restoreScroll();
   wire();
@@ -541,7 +602,7 @@ function viewDay(){
   var g = '<div class="grid">';
   g += ring('시간', clock(tp, 0, tp.toFixed(1) + '<em>%</em>',
         isToday ? fmtLeft(leftMs) + ' 남음' : (tp ? '끝난 날' : '아직'),
-        {solo:true}));
+        {solo:true}), 'time');
 
   var parts = [];
   S.items.forEach(function(it){
@@ -552,14 +613,14 @@ function viewDay(){
     if (wp !== null) parts.push(wp);
     g += ring(it.name, clock(tp, wp,
           fmtQ(n, it.unit) + '<em>/' + (q > 0 ? fmtQ(q, it.unit) : '—') + '</em>',
-          esc(it.unit), {}));
+          esc(it.unit), {}), it.id);
   });
 
   /* ④ 오늘 전체 — 두 항목을 1:1 로. 세트와 시간은 더할 수 없지만 "제 몫의
      몇 %" 는 같은 자로 잴 수 있고, 유저가 원한 가중도 동률이다. */
   var all = parts.length ? parts.reduce(function(a,b){ return a+b; }, 0) / parts.length : 0;
   g += ring('오늘 전체', clock(tp, all, all.toFixed(0) + '<em>%</em>',
-        '모의고사 · 반도체 1:1', {}));
+        '모의고사 · 반도체 1:1', {}), 'all');
   g += '</div>';
 
   h += '<div class="now">' + g + '<div class="items">';
@@ -571,8 +632,50 @@ function viewDay(){
   return h;
 }
 
-function ring(label, svg){
-  return '<div class="cell"><div class="lb">' + esc(label) + '</div>' + svg + '</div>';
+function ring(label, svg, id){
+  return '<div class="cell"><div class="lb">' + esc(label) + '</div>'
+       + '<button class="zoom" data-act="zoom" data-v="' + (id || "") + '"'
+       + ' aria-label="' + esc(label) + ' 크게 보기">' + svg + '</button></div>';
+}
+
+/* ───────── 확대 / 창 모드 ─────────
+   ?only=<id> renders one face and nothing else, sized to the window — so it can
+   be popped into a small always-visible window and left there. The overlay is
+   the same view without the URL, for when a tap is all that is wanted. */
+function onlyId(){
+  var m = String(location.search).match(/[?&]only=([a-z]+)/i);
+  return m ? m[1] : null;
+}
+function faceOf(id, ds, tp){
+  var isToday = cur === 0, leftMs = 86400000 - (new Date() - dayStart());
+  if (id === "time")
+    return ['시간', clock(tp, 0, tp.toFixed(1) + '<em>%</em>',
+      isToday ? fmtLeft(leftMs) + ' 남음' : (tp ? '끝난 날' : '아직'), {solo:true})];
+  if (id === "all"){
+    var parts = [];
+    S.items.forEach(function(it){
+      var q = quotaOn(it, ds), n = nOn(it.id, ds);
+      var wp = q > 0 ? Math.min(150, n / q * 100) : (n > 0 ? 100 : null);
+      if (wp !== null) parts.push(wp);
+    });
+    var av = parts.length ? parts.reduce(function(a,b){ return a+b; },0)/parts.length : 0;
+    return ['오늘 전체', clock(tp, av, av.toFixed(0) + '<em>%</em>', '모의고사 · 반도체 1:1', {})];
+  }
+  var it = itemById(id);
+  if (!it) return null;
+  var q = quotaOn(it, ds), n = nOn(it.id, ds);
+  var wp = q > 0 ? Math.min(150, n / q * 100) : (n > 0 ? 100 : 0);
+  return [it.name, clock(tp, wp,
+    fmtQ(n, it.unit) + '<em>/' + (q > 0 ? fmtQ(q, it.unit) : '—') + '</em>', esc(it.unit), {})];
+}
+
+function viewOnly(id){
+  var ds = curIso(), f = faceOf(id, ds, timePctOn(ds));
+  if (!f) return '<div class="card">없는 화면이야.</div>';
+  var d = curDate();
+  return '<div class="onlywrap"><div class="lb">' + esc(f[0]) + '</div>' + f[1]
+       + '<div class="onlyd">' + (d.getMonth()+1) + '.' + d.getDate()
+       + ' (' + DOW[d.getDay()] + ')</div></div>';
 }
 
 function viewAll(){
@@ -620,18 +723,36 @@ function quotaRow(it, q, n, ds){
     + '<div class="nm">' + esc(it.name)
     + '<s>' + (cleared ? '목표를 넘겼다'
               : '오늘 ' + fmtQ(q, it.unit) + esc(it.unit)) + '</s></div>'
-    + (it.unit === "시간"
-        /* buttons alone cannot express 3 hours 20 minutes; this is the one
-           number the user asked to type rather than tap toward */
-        ? '<input class="dir" type="number" min="0" step="0.5" inputmode="decimal"'
-          + ' aria-label="오늘 공부한 시간" data-set="' + it.id + '" data-d="' + ds + '"'
-          + ' value="' + n + '">'
-        : '<div class="ct">' + fmtQ(n, it.unit) + '<s> ' + esc(it.unit) + '</s></div>')
+    + '<div class="ct">' + fmtQ(n, it.unit) + '<s> ' + esc(it.unit) + '</s></div>'
     + '<div class="qb">'
     + '<button data-act="inc" data-id="' + it.id + '" data-d="' + ds + '" data-v="' + (-st) + '">−</button>'
     + '<button data-act="inc" data-id="' + it.id + '" data-d="' + ds + '" data-v="' + st + '" class="add">+</button>'
     + '</div></div>';
+  /* A stretch of study is a thing that happened, not a total to overwrite: you
+     type how long it was and it is added to the day. 1:20 · 1.5 · 80분 all mean
+     the same eighty minutes. */
+  if (it.unit === "시간"){
+    h += '<div class="logrow">'
+      + '<input class="dur" type="text" inputmode="text" placeholder="1:20  ·  1.5  ·  80분"'
+      +   ' aria-label="방금 한 시간" data-dur="' + it.id + '" data-d="' + ds + '">'
+      + '<button data-act="addtime" data-id="' + it.id + '" data-d="' + ds + '">더하기</button>'
+      + '</div>';
+  }
   return h;
+}
+
+/* "1:20" -> 1.3333, "1.5" -> 1.5, "80분"/"80m" -> 1.3333. Returns null when it
+   cannot be read, so a typo is never silently logged as some other number. */
+function parseDur(raw){
+  var v = String(raw == null ? "" : raw).trim().toLowerCase();
+  if (!v) return null;
+  var m = v.match(/^(\d{1,2})\s*[:시]\s*(\d{1,2})\s*분?$/);
+  if (m) return (+m[1]) + (+m[2]) / 60;
+  m = v.match(/^(\d+(?:\.\d+)?)\s*(분|min|m)$/);
+  if (m) return (+m[1]) / 60;
+  m = v.match(/^(\d+(?:\.\d+)?)\s*(시간|h|hr)?$/);
+  if (m) return +m[1];
+  return null;
 }
 
 function dayVerdict(owed, got, tp, isToday){
@@ -685,10 +806,9 @@ function wire(){
   });
   /* commit on change (blur or Enter), not on every keystroke — typing "3" on
      the way to "3.5" must not be saved as 3 and re-rendered under the caret */
-  document.querySelectorAll("[data-set]").forEach(function(n){
-    n.addEventListener("change", function(){
-      setN(n.dataset.set, Math.max(0, Math.round((parseFloat(n.value) || 0) * 2) / 2), n.dataset.d);
-      save(); n.blur(); draw();
+  document.querySelectorAll("[data-dur]").forEach(function(n){
+    n.addEventListener("keydown", function(ev){
+      if (ev.key === "Enter") commitDur(n.dataset.dur, n.dataset.d, n);
     });
   });
   var g = document.querySelector(".grid");
@@ -715,7 +835,20 @@ function wire(){
 
 function act(a, n){
   if (a === "tab"){ tab = n.dataset.v; scrollX = 0; draw(); return; }
+  if (a === "zoom"){ zoomId = n.dataset.v || null; draw(); return; }
+  if (a === "unzoom"){ zoomId = null; draw(); return; }
+  if (a === "popout"){
+    /* a small window that can sit on top of everything else, showing one face */
+    window.open(location.pathname + "?only=" + zoomId, "cuckoo_" + zoomId,
+                "width=380,height=460,menubar=no,toolbar=no,location=no,status=no");
+    return;
+  }
   if (a === "day"){ cur = Math.min(0, cur + (+n.dataset.v)); draw(); return; }
+  if (a === "addtime"){
+    var box = document.querySelector('[data-dur="' + n.dataset.id + '"]');
+    if (box) commitDur(n.dataset.id, n.dataset.d, box);
+    return;
+  }
   if (a === "inc"){
     var id = n.dataset.id, ds = n.dataset.d, it = itemById(id);
     addN(id, +n.dataset.v, ds);
@@ -742,6 +875,13 @@ el("setbtn").addEventListener("click", function(){ showSet = !showSet; draw(); }
 el("resetbtn").addEventListener("click", function(){
   if (!confirm("cuckoo 기록을 전부 지울까? 되돌릴 수 없어.")) return;
   S = blank(); save(); showSet = false; draw();
+});
+
+/* the popped-out window and the page share one key, so a change in either has
+   to reach the other — otherwise the small window quietly goes stale */
+window.addEventListener("storage", function(ev){
+  if (ev.key !== KEY) return;
+  load(); draw();
 });
 
 load();
