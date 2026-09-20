@@ -106,13 +106,14 @@ html,body{margin:0;background:var(--bg);color:var(--ink);
 .dots i{width:6px;height:6px;border-radius:50%;background:var(--line);display:block}
 
 /* circle 1 has no second hand, so the colour carries the hour */
-.clk .sweep{fill:none;stroke-width:9;stroke-linecap:butt;stroke:var(--ink-3);opacity:.30}
-.clk.tone1 .sweep{opacity:.14}
-.clk.tone2 .sweep{opacity:.26}
-.clk.tone3 .sweep{opacity:.42}
-.clk.tone4 .sweep{opacity:.62}
-.clk.tone5 .sweep{opacity:.9;stroke:var(--hot)}
+.clk .wedge{fill:var(--ink-3);opacity:.30;transition:opacity .4s}
+.clk.tone1 .wedge{opacity:.12}
+.clk.tone2 .wedge{opacity:.22}
+.clk.tone3 .wedge{opacity:.34}
+.clk.tone4 .wedge{opacity:.48}
+.clk.tone5 .wedge{fill:var(--hot);opacity:.42}
 .clk.tone5 .hand.t{stroke:var(--hot)}
+.clk .plate{fill:var(--surface)}
 .clockmid .pc.neutral{color:var(--ink)}
 
 .items{margin-top:10px;border-top:1px solid var(--line-soft);padding-top:2px}
@@ -239,14 +240,18 @@ function blank(){
       { id:"final", name:"최종면접", date:"2026-11-30" }
     ],
     items: [
-      /* 주말 가중 4 — 25 평일 × 1 + 10 주말 × 4 = 65 세트, 목표 60 을 5 넘긴다.
-         평일에 2세트를 얹으면 반도체 2시간과 합쳐 하루 4시간이 되고, 그건
-         번아웃 중에 지켜지지 않는 숫자다. */
-      { id:"mock", track:"인적성", name:"모의고사",   unit:"세트", goal:60,  step:1,   wknd:4, due:"gsat"  },
+      /* 요일별 배분. 일 3 · 화 2 · 목 2 · 토 3 = 주당 10, 5주면 50 — 그래서
+         목표가 60 이 아니라 50 이다. 주말 4 는 유저가 못 한다고 했고, 그걸
+         맞추려 평일을 3일로 늘리면 같은 자리로 돌아온다. 0 인 요일은 몫이
+         없는 날이고, 그건 빠진 게 아니라 설계다.
+         금요일은 그룹미팅, 수요일은 비워두는 날이라 평일 2일은 화·목. */
+      { id:"mock", track:"인적성", name:"모의고사",   unit:"세트", goal:50,  step:1,
+        days:[3,0,2,0,2,0,3], due:"gsat"  },
       /* 사관학교 편수와 책 쪽수는 길이가 제각각이라 서로 더할 수 없다. 시간은
          더해진다 — 두 가지 공부를 하나의 원으로 묶을 수 있는 유일한 단위다.
          하루 2시간 × 11/30 까지 = 144. */
-      { id:"semi", track:"면접",   name:"반도체 공부", unit:"시간", goal:144, step:0.5, wknd:1, due:"final" }
+      { id:"semi", track:"면접",   name:"반도체 공부", unit:"시간", goal:144, step:0.5,
+        days:[1,1,1,1,1,1,1], due:"final" }
     ],
     /* "YYYY-MM-DD": { itemId: count } — the day is the unit of record, and the
        total is derived from it. Keeping a separate running total would let the
@@ -383,7 +388,12 @@ function daysFrom(dateStr, fromIsoStr){
    later day's share rises — while letting the weekend carry more. The result
    is rounded so the number on the face is one you can actually finish. */
 function isWknd(dateStr){ var w = fromIso(dateStr).getDay(); return w === 0 || w === 6; }
-function wOf(it, dateStr){ return isWknd(dateStr) ? (it.wknd || 1) : 1; }
+/* a weight per weekday, so "화·목만 2세트, 주말 3세트" is expressible without
+   giving up the self-correction — a zero day simply carries none of the load */
+function wOf(it, dateStr){
+  var d = it.days || [1,1,1,1,1,1,1];
+  return d[fromIso(dateStr).getDay()];
+}
 function quotaOn(it, dateStr){
   var left = it.goal - totalBefore(it.id, dateStr);
   if (left <= 0) return 0;
@@ -436,7 +446,20 @@ function clock(timeP, workP, mid, sub, opt){
        + '" class="tick' + (i%6 ? '' : ' big') + '"/>';
   }
   if (solo){
-    if (timeP > 0.3) h += '<path d="' + arc(0, Math.min(timeP,99.99), r2) + '" class="sweep"/>';
+    /* the day fills the face rather than tracing its rim — a wedge sweeping
+       from noon is the plainest possible picture of time being used up, and
+       the tone deepens with it so a glance at the colour is enough */
+    var tP = Math.min(timeP, 99.99);
+    if (tP > 0.2){
+      var s0 = pt(0, R - 3), s1 = pt(tP, R - 3);
+      var big = tP > 50 ? 1 : 0;
+      h += '<path class="wedge" d="M' + C + ' ' + C
+         + ' L' + s0[0].toFixed(1) + ' ' + s0[1].toFixed(1)
+         + ' A' + (R-3) + ' ' + (R-3) + ' 0 ' + big + ' 1 '
+         + s1[0].toFixed(1) + ' ' + s1[1].toFixed(1) + ' Z"/>';
+    }
+    /* a plate under the numbers so they stay readable over the fill */
+    h += '<circle cx="' + C + '" cy="' + C + '" r="46" class="plate"/>';
   } else {
     var lo = Math.min(timeP, workP), hi = Math.max(timeP, workP);
     if (hi - lo > 0.3)
@@ -456,13 +479,30 @@ function clock(timeP, workP, mid, sub, opt){
        + '<div class="sb">' + sub + '</div></div></div>';
 }
 
+/* The page redraws every second, and innerHTML throws the scroll container
+   away with it — which is why a swipe kept snapping back to the first circle.
+   The offset is carried across the rebuild, and while a finger is actually
+   moving the carousel the tick stands down entirely so momentum is not fought. */
+var scrollX = 0, scrolling = 0;
+function keepScroll(){
+  var g = document.querySelector(".grid");
+  if (g) scrollX = g.scrollLeft;
+}
+function restoreScroll(){
+  var g = document.querySelector(".grid");
+  if (!g || !scrollX) return;
+  g.scrollLeft = scrollX;
+}
+
 function render(){
+  keepScroll();
   var h = '<div class="tabs">'
     + '<button data-act="tab" data-v="day"' + (tab==="day" ? ' aria-selected="true"' : '') + '>오늘</button>'
     + '<button data-act="tab" data-v="all"' + (tab==="all" ? ' aria-selected="true"' : '') + '>전체</button>'
     + '</div>';
   h += (tab === "day") ? viewDay() : viewAll();
   el("view").innerHTML = h;
+  restoreScroll();
   wire();
 }
 
@@ -506,8 +546,10 @@ function viewDay(){
   var parts = [];
   S.items.forEach(function(it){
     var q = quotaOn(it, ds), n = nOn(it.id, ds);
-    var wp = q > 0 ? Math.min(150, n / q * 100) : (n > 0 ? 100 : 0);
-    parts.push(wp);
+    /* a day this item does not ask for must not drag the average down — it is
+       not 0% done, it is not being asked */
+    var wp = q > 0 ? Math.min(150, n / q * 100) : (n > 0 ? 100 : null);
+    if (wp !== null) parts.push(wp);
     g += ring(it.name, clock(tp, wp,
           fmtQ(n, it.unit) + '<em>/' + (q > 0 ? fmtQ(q, it.unit) : '—') + '</em>',
           esc(it.unit), {}));
@@ -578,8 +620,13 @@ function quotaRow(it, q, n, ds){
     + '<div class="nm">' + esc(it.name)
     + '<s>' + (cleared ? '목표를 넘겼다'
               : '오늘 ' + fmtQ(q, it.unit) + esc(it.unit)) + '</s></div>'
-    + '<div class="ct">' + fmtQ(n, it.unit)
-    + '<s> ' + esc(it.unit) + '</s></div>'
+    + (it.unit === "시간"
+        /* buttons alone cannot express 3 hours 20 minutes; this is the one
+           number the user asked to type rather than tap toward */
+        ? '<input class="dir" type="number" min="0" step="0.5" inputmode="decimal"'
+          + ' aria-label="오늘 공부한 시간" data-set="' + it.id + '" data-d="' + ds + '"'
+          + ' value="' + n + '">'
+        : '<div class="ct">' + fmtQ(n, it.unit) + '<s> ' + esc(it.unit) + '</s></div>')
     + '<div class="qb">'
     + '<button data-act="inc" data-id="' + it.id + '" data-d="' + ds + '" data-v="' + (-st) + '">−</button>'
     + '<button data-act="inc" data-id="' + it.id + '" data-d="' + ds + '" data-v="' + st + '" class="add">+</button>'
@@ -636,6 +683,19 @@ function wire(){
       save(); n.blur(); draw();
     });
   });
+  /* commit on change (blur or Enter), not on every keystroke — typing "3" on
+     the way to "3.5" must not be saved as 3 and re-rendered under the caret */
+  document.querySelectorAll("[data-set]").forEach(function(n){
+    n.addEventListener("change", function(){
+      setN(n.dataset.set, Math.max(0, Math.round((parseFloat(n.value) || 0) * 2) / 2), n.dataset.d);
+      save(); n.blur(); draw();
+    });
+  });
+  var g = document.querySelector(".grid");
+  if (g) g.addEventListener("scroll", function(){
+    scrolling = Date.now();
+    scrollX = g.scrollLeft;
+  }, { passive:true });
   var st = el("st");
   if (st) st.addEventListener("change", function(){ S.start = st.value; save(); });
   document.querySelectorAll("[data-mk]").forEach(function(n){
@@ -654,7 +714,7 @@ function wire(){
 }
 
 function act(a, n){
-  if (a === "tab"){ tab = n.dataset.v; draw(); return; }
+  if (a === "tab"){ tab = n.dataset.v; scrollX = 0; draw(); return; }
   if (a === "day"){ cur = Math.min(0, cur + (+n.dataset.v)); draw(); return; }
   if (a === "inc"){
     var id = n.dataset.id, ds = n.dataset.d, it = itemById(id);
@@ -668,6 +728,7 @@ function act(a, n){
 /* the page redraws every second; redrawing under a caret would eat what is
    being typed, so the tick stands down while an input has focus */
 function busy(){
+  if (Date.now() - scrolling < 500) return true;
   var a = document.activeElement;
   return !!(a && (a.tagName === "INPUT" || a.tagName === "TEXTAREA"));
 }
