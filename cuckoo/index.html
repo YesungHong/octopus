@@ -46,8 +46,60 @@ html,body{margin:0;background:var(--bg);color:var(--ink);
 .now .big{font-family:var(--font-num);font-size:38px;font-weight:600;letter-spacing:-.025em;
   font-variant-numeric:tabular-nums;line-height:1.05;margin-top:1px}
 .now .big em{font-style:normal;font-size:17px;color:var(--ink-3);margin-left:5px;letter-spacing:0}
-.daybar{height:5px;border-radius:3px;background:var(--sunk);overflow:hidden;margin-top:11px}
-.daybar i{display:block;height:100%;background:var(--ink-3)}
+/* ── tabs ── */
+.tabs{display:grid;grid-template-columns:1fr 1fr;gap:2px;background:var(--sunk);
+  border-radius:10px;padding:3px;margin-bottom:12px}
+.tabs button{appearance:none;border:0;background:transparent;color:var(--ink-3);font:inherit;
+  font-size:14px;font-weight:650;padding:9px 0;border-radius:8px;cursor:pointer}
+.tabs button[aria-selected=true]{background:var(--surface);color:var(--ink);box-shadow:var(--shadow)}
+
+/* ── date cursor ── */
+.datenav{display:flex;align-items:center;gap:8px;margin-bottom:10px}
+.datenav button{appearance:none;border:1px solid var(--line);background:var(--bg);color:var(--ink-2);
+  font:inherit;font-size:17px;line-height:1;width:38px;height:38px;border-radius:9px;cursor:pointer;flex:none}
+.datenav button:disabled{opacity:.3;cursor:default}
+.datenav .dt{flex:1;text-align:center;font-size:15px;font-weight:650}
+.datenav .dt s{display:block;text-decoration:none;font-size:11.5px;font-weight:400;
+  color:var(--ink-3);font-variant-numeric:tabular-nums;letter-spacing:.03em}
+
+/* ── the clock ── */
+.clockwrap{position:relative;width:176px;height:176px;margin:2px auto 4px}
+.clk{width:176px;height:176px;display:block}
+.clk .face{fill:var(--sunk);stroke:var(--line-soft);stroke-width:1}
+.clk .tick{stroke:var(--line);stroke-width:1.4;stroke-linecap:round}
+.clk .tick.big{stroke:var(--ink-3);stroke-width:2}
+.clk .gap{fill:none;stroke-width:9;stroke-linecap:butt;opacity:.5}
+.clk .gap.up{stroke:var(--accent)}
+.clk .gap.dn{stroke:var(--hot)}
+.clk .hand{stroke-linecap:round}
+.clk .hand.t{stroke:var(--ink-3);stroke-width:5}
+.clk .hand.w{stroke:var(--hot);stroke-width:3}
+.clk .hand.w.up{stroke:var(--accent)}
+.clk .pin{fill:var(--ink-2)}
+.clockmid{position:absolute;inset:0;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;pointer-events:none}
+.clockmid .pc{font-family:var(--font-num);font-size:29px;font-weight:600;letter-spacing:-.02em;
+  font-variant-numeric:tabular-nums;line-height:1;color:var(--hot)}
+.clockmid .pc.up{color:var(--accent)}
+.clockmid .pc em{font-style:normal;font-size:14px;margin-left:1px}
+.clockmid .sb{font-size:11.5px;color:var(--ink-3);margin-top:3px;font-variant-numeric:tabular-nums}
+
+.items{margin-top:6px}
+
+/* ── 전체 탭 ── */
+.allrow{display:flex;align-items:center;gap:14px;margin-top:14px;padding-top:14px;
+  border-top:1px solid var(--line-soft)}
+.allrow .clockwrap{width:112px;height:112px;flex:none;margin:0}
+.allrow .clk{width:112px;height:112px}
+.allrow .clockmid .pc{font-size:20px}
+.allrow .clockmid .pc em{font-size:11px}
+.allrow .clockmid .sb{font-size:10px}
+.allmeta{flex:1;min-width:0}
+.allmeta .nm{font-size:14.5px;font-weight:650}
+.allmeta .ct{font-family:var(--font-num);font-size:17px;font-weight:600;
+  font-variant-numeric:tabular-nums;margin-top:1px}
+.allmeta .ct s{text-decoration:none;color:var(--ink-3);font-size:13px}
+.allmeta .sb2{font-size:12px;color:var(--ink-2);margin-top:5px;line-height:1.45}
 
 .q{display:flex;align-items:center;gap:11px;padding:12px 0;border-top:1px solid var(--line-soft)}
 .q:first-of-type{border-top:0}
@@ -226,8 +278,8 @@ function total(id){
   return t;
 }
 function todayN(id){ var d = S.log[todayIso()]; return (d && d[id]) || 0; }
-function addN(id, v){
-  var d = todayIso();
+function addN(id, v, ds){
+  var d = ds || todayIso();
   if (!S.log[d]) S.log[d] = {};
   S.log[d][id] = Math.max(0, (S.log[d][id] || 0) + v);
   if (!S.log[d][id]) delete S.log[d][id];
@@ -256,27 +308,121 @@ function quota(it){
 
 /* ───────── render ───────── */
 var DOW = ["일","월","화","수","목","금","토"];
+var tab = "day";     /* day | all */
+var cur = 0;         /* day offset; 0 = today, negative = past */
+
+function curDate(){ var d = dayStart(); d.setDate(d.getDate() + cur); return d; }
+function curIso(){ return iso(curDate()); }
+
+/* totals as they stood at the START of a given day, so a past day can be shown
+   with the quota it actually had that morning rather than today's */
+function totalBefore(id, dateStr){
+  var t = 0;
+  for (var d in S.log) if (d < dateStr) t += (S.log[d][id] || 0);
+  return t;
+}
+function daysFrom(dateStr, fromIsoStr){
+  var from = fromIso(fromIsoStr);
+  return Math.max(0, Math.round((endOf(dateStr) - from) / 86400000));
+}
+function quotaOn(it, dateStr){
+  var left = it.goal - totalBefore(it.id, dateStr);
+  if (left <= 0) return 0;
+  var d = daysFrom(markById(it.due).date, dateStr);
+  return d <= 0 ? left : left / d;
+}
+function nOn(id, dateStr){ var d = S.log[dateStr]; return (d && d[id]) || 0; }
+
+/* the day's clock: 100% is one full turn, noon-up, clockwise */
+function timePctOn(dateStr){
+  var t = todayIso();
+  if (dateStr < t) return 100;
+  if (dateStr > t) return 0;
+  return dayPct();
+}
+
+/* ───────── the clock ─────────
+   Two hands on one face. The grey hand is time, the coloured one is what has
+   been done. Whichever is further round is ahead, and the arc between them is
+   the gap — so "역전" is not a number to read but a shape to see. */
+function clock(timeP, workP, mid, sub){
+  var R = 74, C = 88, r2 = 60;
+  function pt(pct, rad){
+    var a = (pct/100) * Math.PI*2 - Math.PI/2;
+    return [C + rad*Math.cos(a), C + rad*Math.sin(a)];
+  }
+  function arc(p0, p1, rad){
+    var s = pt(p0, rad), e = pt(p1, rad);
+    var big = (((p1 - p0) % 100) + 100) % 100 > 50 ? 1 : 0;
+    return 'M' + s[0].toFixed(1) + ' ' + s[1].toFixed(1)
+         + ' A' + rad + ' ' + rad + ' 0 ' + big + ' 1 ' + e[0].toFixed(1) + ' ' + e[1].toFixed(1);
+  }
+  var ahead = workP >= timeP;
+  var h = '<svg class="clk" viewBox="0 0 176 176" aria-hidden="true">';
+  h += '<circle cx="88" cy="88" r="' + R + '" class="face"/>';
+  for (var i=0;i<24;i++){
+    var o = pt(i/24*100, R), q = pt(i/24*100, R - (i%6 ? 5 : 9));
+    h += '<line x1="'+o[0].toFixed(1)+'" y1="'+o[1].toFixed(1)+'" x2="'+q[0].toFixed(1)+'" y2="'+q[1].toFixed(1)
+       + '" class="tick' + (i%6 ? '' : ' big') + '"/>';
+  }
+  /* the gap, drawn from whichever hand is behind to whichever is ahead */
+  var lo = Math.min(timeP, workP), hi = Math.max(timeP, workP);
+  if (hi - lo > 0.3)
+    h += '<path d="' + arc(lo, hi, r2) + '" class="gap ' + (ahead ? 'up' : 'dn') + '"/>';
+  var ht = pt(Math.min(timeP,100), R - 16), hw = pt(Math.min(workP,100), R - 30);
+  h += '<line x1="88" y1="88" x2="'+ht[0].toFixed(1)+'" y2="'+ht[1].toFixed(1)+'" class="hand t"/>';
+  h += '<line x1="88" y1="88" x2="'+hw[0].toFixed(1)+'" y2="'+hw[1].toFixed(1)+'" class="hand w'
+     + (ahead ? ' up' : '') + '"/>';
+  h += '<circle cx="88" cy="88" r="4.5" class="pin"/></svg>';
+  return '<div class="clockwrap">' + h
+       + '<div class="clockmid"><div class="pc' + (ahead ? ' up' : '') + '">' + mid + '</div>'
+       + '<div class="sb">' + sub + '</div></div></div>';
+}
 
 function render(){
-  var now = new Date(), dp = dayPct();
-  var h = '<div class="now">'
-    + '<div class="d">' + (now.getMonth()+1) + '월 ' + now.getDate() + '일 ('
-    +   DOW[now.getDay()] + ')   ' + pad2(now.getHours()) + ':' + pad2(now.getMinutes())
-    +   ':' + pad2(now.getSeconds()) + '</div>'
-    + '<div class="big">오늘 ' + dp.toFixed(1) + '%<em>지났다 · ' + fmtLeft(86400000 - (now - dayStart())) + ' 남음</em></div>'
-    + '<div class="daybar"><i style="width:' + dp.toFixed(2) + '%"></i></div>';
+  var h = '<div class="tabs">'
+    + '<button data-act="tab" data-v="day"' + (tab==="day" ? ' aria-selected="true"' : '') + '>오늘</button>'
+    + '<button data-act="tab" data-v="all"' + (tab==="all" ? ' aria-selected="true"' : '') + '>전체</button>'
+    + '</div>';
+  h += (tab === "day") ? viewDay() : viewAll();
+  el("view").innerHTML = h;
+  wire();
+}
+
+function viewDay(){
+  var ds = curIso(), d = curDate(), now = new Date();
+  var isToday = cur === 0;
+  var tp = timePctOn(ds);
 
   var owed = 0, got = 0;
   S.items.forEach(function(it){
-    var q = quota(it), n = todayN(it.id);
+    var q = quotaOn(it, ds), n = nOn(it.id, ds);
     if (q >= 0.5){ owed += Math.ceil(q); got += Math.min(n, Math.ceil(q)); }
-    h += quotaRow(it, q, n);
   });
-  h += '<div class="verdict">' + dayVerdict(owed, got, dp) + '</div></div>';
+  var wp = owed ? got / owed * 100 : 0;
 
-  h += '<div class="card"><h2>전체</h2>';
+  var h = '<div class="datenav">'
+    + '<button data-act="day" data-v="-1">‹</button>'
+    + '<div class="dt">' + (d.getMonth()+1) + '월 ' + d.getDate() + '일 (' + DOW[d.getDay()] + ')'
+    +   (isToday ? '<s>' + pad2(now.getHours()) + ':' + pad2(now.getMinutes()) + ':' + pad2(now.getSeconds()) + '</s>'
+                 : '<s>' + (cur < 0 ? -cur + '일 전' : cur + '일 뒤') + '</s>') + '</div>'
+    + '<button data-act="day" data-v="1"' + (cur >= 0 ? ' disabled' : '') + '>›</button></div>';
+
+  h += '<div class="now">'
+    + clock(tp, wp, owed ? Math.round(wp) + '<em>%</em>' : '—',
+            '시간 ' + tp.toFixed(0) + '%')
+    + '<div class="items">';
+  S.items.forEach(function(it){
+    h += quotaRow(it, quotaOn(it, ds), nOn(it.id, ds), ds);
+  });
+  h += '</div><div class="verdict">' + dayVerdict(owed, got, tp, isToday) + '</div></div>';
+  return h;
+}
+
+function viewAll(){
+  var h = '';
   [["인적성", ["skct","gsat"]], ["면접", ["final"]]].forEach(function(t){
-    h += '<div class="dl">';
+    h += '<div class="card"><h2>' + t[0] + '</h2><div class="dl">';
     t[1].forEach(function(mid){
       var m = markById(mid);
       h += '<div class="chip"><b>' + esc(m.name) + ' · ' + m.date.slice(5).replace("-","/") + '</b>'
@@ -287,22 +433,30 @@ function render(){
     S.items.filter(function(x){ return x.track === t[0]; }).forEach(function(it){
       var tn = total(it.id), pct = it.goal > 0 ? tn / it.goal * 100 : 0;
       var pp = periodPct(markById(it.due).date);
-      h += '<div class="tot"><div class="nm">' + esc(it.name) + '</div>'
-         + '<div class="ct">' + tn + '<s> / ' + it.goal + ' ' + esc(it.unit) + '</s></div></div>'
-         + '<div class="rail' + (pct >= 100 ? ' over' : '') + '">'
-         +   '<i style="width:' + Math.min(100, pct).toFixed(2) + '%"></i>'
-         +   '<u style="left:calc(' + Math.min(100, pp).toFixed(2) + '% - 1px)"></u></div>'
-         + '<div class="legend"><span>' + pct.toFixed(1) + '%</span>'
-         +   '<span>│ 시간 ' + pp.toFixed(1) + '%</span></div>';
+      h += '<div class="allrow">'
+         + clock(pp, pct, Math.round(pct) + '<em>%</em>', '시간 ' + pp.toFixed(0) + '%')
+         + '<div class="allmeta"><div class="nm">' + esc(it.name) + '</div>'
+         + '<div class="ct">' + tn + '<s> / ' + it.goal + ' ' + esc(it.unit) + '</s></div>'
+         + '<div class="sb2">' + allLine(it, tn, pct, pp) + '</div></div></div>';
     });
+    h += '</div>';
   });
-  h += '</div>';
-
-  el("view").innerHTML = h;
-  wire();
+  return h;
 }
 
-function quotaRow(it, q, n){
+function allLine(it, tn, pct, pp){
+  var left = it.goal - tn;
+  if (left <= 0) return '목표를 넘겼다. 여기서부터는 여유분.';
+  var d = daysLeft(markById(it.due).date);
+  var per = d ? left / d : left;
+  var s = '남은 ' + left + esc(it.unit) + ' ÷ ' + d + '일 = 하루 '
+        + (per < 1 ? per.toFixed(2) : per.toFixed(1));
+  s += pct >= pp ? ' · 시간보다 ' + (pct-pp).toFixed(0) + '%p 앞서 있다.'
+                 : ' · 시간이 ' + (pp-pct).toFixed(0) + '%p 앞서 있다.';
+  return s;
+}
+
+function quotaRow(it, q, n, ds){
   var rare = q > 0 && q < 0.5;
   var goal = Math.ceil(q);
   var done = !rare && q > 0 && n >= goal;
@@ -312,26 +466,25 @@ function quotaRow(it, q, n){
   if (rare) h += '<s>' + Math.round(1/q) + '일에 ' + esc(it.unit) + ' 하나</s>';
   else if (cleared) h += '<s>목표를 넘겼다</s>';
   h += '</div>';
-  if (rare) h += '<div class="rare">오늘 ' + n + '</div>';
+  if (rare) h += '<div class="rare">' + n + esc(it.unit) + '</div>';
   else h += '<div class="ct">' + n + '<s> / ' + goal + '</s></div>';
   h += '<div class="qb">'
-    + '<button data-act="inc" data-id="' + it.id + '" data-v="-1">−</button>'
-    + '<button data-act="inc" data-id="' + it.id + '" data-v="1" class="add">+</button>'
+    + '<button data-act="inc" data-id="' + it.id + '" data-d="' + ds + '" data-v="-1">−</button>'
+    + '<button data-act="inc" data-id="' + it.id + '" data-d="' + ds + '" data-v="1" class="add">+</button>'
     + '</div></div>';
   return h;
 }
 
-/* One line, and it ends in something to do. "12%p 뒤처짐" has no next move;
-   "오늘 3개 남았다" does. */
-function dayVerdict(owed, got, dp){
-  if (!owed) return '오늘 몫은 없다. 남은 건 전부 여유분이다.';
+function dayVerdict(owed, got, tp, isToday){
+  if (!owed) return '이 날 몫은 없다. 쌓이는 건 전부 여유분이다.';
   if (got >= owed)
-    return '<b>오늘 몫 ' + owed + '개 다 했다.</b> 여기서 더 하는 만큼 내일이 줄어든다.';
-  var left = owed - got;
-  var mine = got / owed * 100;
-  return '오늘 몫 <b>' + owed + '</b> 중 <b>' + got + '</b>. 남은 <b class="hot">'
-       + left + '개</b>를 남은 <b>' + fmtLeft(86400000 - (new Date() - dayStart()))
-       + '</b> 안에. <br>진행 ' + mine.toFixed(0) + '% · 하루는 ' + dp.toFixed(0) + '% 지났다.';
+    return '<b>몫 ' + owed + '개 다 했다.</b> 여기서 더 하는 만큼 내일이 줄어든다.';
+  var left = owed - got, wp = got / owed * 100;
+  if (!isToday)
+    return '몫 <b>' + owed + '</b> 중 <b>' + got + '</b>. ' + left + '개가 남은 날들로 넘어갔다.';
+  return '몫 <b>' + owed + '</b> 중 <b>' + got + '</b>. 남은 <b class="hot">' + left + '개</b>를 '
+       + '<b>' + fmtLeft(86400000 - (new Date() - dayStart())) + '</b> 안에.<br>'
+       + (wp >= tp ? '진행이 시간을 앞질렀다.' : '시간이 ' + (tp - wp).toFixed(0) + '%p 앞서 있다.');
 }
 
 function fmtLeft(ms){
@@ -381,10 +534,12 @@ function wire(){
 }
 
 function act(a, n){
+  if (a === "tab"){ tab = n.dataset.v; draw(); return; }
+  if (a === "day"){ cur = Math.min(0, cur + (+n.dataset.v)); draw(); return; }
   if (a === "inc"){
-    var id = n.dataset.id, it = itemById(id);
-    addN(id, +n.dataset.v);
-    if (+n.dataset.v > 0 && it) toast(it.name + ' 오늘 ' + todayN(id) + it.unit);
+    var id = n.dataset.id, ds = n.dataset.d, it = itemById(id);
+    addN(id, +n.dataset.v, ds);
+    if (+n.dataset.v > 0 && it) toast(it.name + ' ' + nOn(id, ds) + it.unit);
     save(); draw(); return;
   }
   if (a === "setdone"){ showSet = false; draw(); return; }
