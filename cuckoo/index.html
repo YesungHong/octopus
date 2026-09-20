@@ -134,14 +134,11 @@ body.onlypage .mast,body.onlypage .foot{display:none}
 .onlyd{font-size:12px;color:var(--ink-3);font-variant-numeric:tabular-nums}
 
 /* circle 1 has no second hand, so the colour carries the hour */
-.clk .wedge{fill:var(--ink-3);opacity:.30;transition:opacity .4s}
-.clk.tone1 .wedge{opacity:.12}
-.clk.tone2 .wedge{opacity:.22}
-.clk.tone3 .wedge{opacity:.34}
-.clk.tone4 .wedge{opacity:.48}
-.clk.tone5 .wedge{fill:var(--hot);opacity:.42}
-.clk.tone5 .hand.t{stroke:var(--hot)}
+.clk .wedge{opacity:.85;stroke:none}
+@media (prefers-color-scheme:dark){ .clk .wedge{opacity:.72} }
+.clk .redband{fill:none;stroke:#C0231A;stroke-width:5;stroke-linecap:butt;opacity:.55}
 .clk .plate{fill:var(--surface)}
+.clk.tone5 .plate{stroke:#C0231A;stroke-width:1.5;stroke-opacity:.5}
 .clockmid .pc.neutral{color:var(--ink)}
 
 .items{margin-top:10px;border-top:1px solid var(--line-soft);padding-top:2px}
@@ -466,6 +463,30 @@ function timePctOn(dateStr){
 function toneOf(p){
   return p < 20 ? 1 : p < 40 ? 2 : p < 60 ? 3 : p < 80 ? 4 : 5;
 }
+
+/* ───────── 타코미터 ─────────
+   The fill is not one colour that deepens but a sweep that travels — calm
+   through the morning, amber by mid-afternoon, red at the end. Colour does the
+   reading so the number does not have to, and the red band on the rim marks
+   where the day stops being recoverable.
+
+   Fixed hex rather than CSS variables: these have to be interpolated, and they
+   were picked to hold up on both the light and the dark background. */
+var RAMP = [[0, 0x6E, 0x8B, 0x93], [38, 0x2F, 0x9E, 0x8F],
+            [62, 0xE0, 0xA3, 0x2B], [82, 0xD9, 0x6B, 0x1F], [100, 0xC0, 0x23, 0x1A]];
+var REDLINE = 85;
+function rampColor(p){
+  p = Math.max(0, Math.min(100, p));
+  for (var i = 1; i < RAMP.length; i++){
+    if (p > RAMP[i][0] && i < RAMP.length - 1) continue;
+    var a = RAMP[i-1], b = RAMP[i];
+    var t = b[0] === a[0] ? 0 : (p - a[0]) / (b[0] - a[0]);
+    t = Math.max(0, Math.min(1, t));
+    var c = [1,2,3].map(function(k){ return Math.round(a[k] + (b[k]-a[k]) * t); });
+    return '#' + c.map(function(v){ return v.toString(16).padStart(2,"0"); }).join("");
+  }
+  return '#6E8B93';
+}
 function clock(timeP, workP, mid, sub, opt){
   opt = opt || {};
   var R = 74, C = 88, r2 = 60;
@@ -492,14 +513,22 @@ function clock(timeP, workP, mid, sub, opt){
     /* the day fills the face rather than tracing its rim — a wedge sweeping
        from noon is the plainest possible picture of time being used up, and
        the tone deepens with it so a glance at the colour is enough */
+    /* the red band on the bezel, drawn whether or not the needle has reached it */
+    h += '<path d="' + arc(REDLINE, 99.99, R - 4) + '" class="redband"/>';
     var tP = Math.min(timeP, 99.99);
-    if (tP > 0.2){
-      var s0 = pt(0, R - 3), s1 = pt(tP, R - 3);
-      var big = tP > 50 ? 1 : 0;
-      h += '<path class="wedge" d="M' + C + ' ' + C
-         + ' L' + s0[0].toFixed(1) + ' ' + s0[1].toFixed(1)
-         + ' A' + (R-3) + ' ' + (R-3) + ' 0 ' + big + ' 1 '
-         + s1[0].toFixed(1) + ' ' + s1[1].toFixed(1) + ' Z"/>';
+    if (tP > 0.4){
+      /* swept in slices so each degree can carry its own colour — SVG has no
+         conic gradient, and a single flat fill would lose the whole point */
+      var N = Math.max(2, Math.ceil(tP / 1.5));
+      for (var k = 0; k < N; k++){
+        var p0 = tP * k / N, p1 = tP * (k+1) / N + 0.35;
+        if (p1 > tP + 0.35) p1 = tP;
+        var a0 = pt(p0, R - 4), a1 = pt(p1, R - 4);
+        h += '<path class="wedge" fill="' + rampColor(p1) + '" d="M' + C + ' ' + C
+           + ' L' + a0[0].toFixed(1) + ' ' + a0[1].toFixed(1)
+           + ' A' + (R-4) + ' ' + (R-4) + ' 0 0 1 '
+           + a1[0].toFixed(1) + ' ' + a1[1].toFixed(1) + ' Z"/>';
+      }
     }
     /* a plate under the numbers so they stay readable over the fill */
     h += '<circle cx="' + C + '" cy="' + C + '" r="46" class="plate"/>';
@@ -509,7 +538,8 @@ function clock(timeP, workP, mid, sub, opt){
       h += '<path d="' + arc(lo, hi, r2) + '" class="gap ' + (ahead ? 'up' : 'dn') + '"/>';
   }
   var ht = pt(Math.min(timeP,100), R - 16);
-  h += '<line x1="88" y1="88" x2="'+ht[0].toFixed(1)+'" y2="'+ht[1].toFixed(1)+'" class="hand t"/>';
+  h += '<line x1="88" y1="88" x2="'+ht[0].toFixed(1)+'" y2="'+ht[1].toFixed(1)+'" class="hand t"'
+     + (solo ? ' stroke="' + rampColor(timeP) + '"' : '') + '/>';
   if (!solo){
     var hw = pt(Math.min(workP,100), R - 30);
     h += '<line x1="88" y1="88" x2="'+hw[0].toFixed(1)+'" y2="'+hw[1].toFixed(1)+'" class="hand w'
