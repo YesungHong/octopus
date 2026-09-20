@@ -651,6 +651,8 @@ function viewDay(){
   var all = parts.length ? parts.reduce(function(a,b){ return a+b; }, 0) / parts.length : 0;
   g += ring('오늘 전체', clock(tp, all, all.toFixed(0) + '<em>%</em>',
         '모의고사 · 반도체 1:1', {}), 'all');
+  var pf = faceOf('period', ds, tp);
+  g += ring(pf[0], pf[1], 'period');
   g += '</div>';
 
   h += '<div class="now">' + g + '<div class="items">';
@@ -681,6 +683,14 @@ function faceOf(id, ds, tp){
   if (id === "time")
     return ['시간', clock(tp, 0, tp.toFixed(1) + '<em>%</em>',
       isToday ? fmtLeft(leftMs) + ' 남음' : (tp ? '끝난 날' : '아직'), {solo:true})];
+  /* the long gauge: the whole run from the day cuckoo started to the last
+     deadline, on the same dial as the day. Same picture, different scale —
+     and it is the one that has been quietly filling since September. */
+  if (id === "period"){
+    var m = markById("final"), pp = periodPct(m.date), dl = daysLeft(m.date);
+    return ['전체 시간', clock(pp, 0, pp.toFixed(1) + '<em>%</em>',
+      dl + '일 남음 · ' + m.date.slice(5).replace("-","/"), {solo:true})];
+  }
   if (id === "all"){
     var parts = [];
     S.items.forEach(function(it){
